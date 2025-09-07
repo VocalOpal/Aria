@@ -42,7 +42,7 @@ A comprehensive voice training application featuring real-time pitch monitoring,
 
 ### Installation
 1. **Install Python 3.7+** (3.9+ recommended)
-2. **Install dependencies:**
+2. **Install dependencies in CMD**
    ```bash
    pip install -r requirements.txt
    ```
