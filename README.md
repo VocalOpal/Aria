@@ -4,35 +4,35 @@
 
 A comprehensive voice training application featuring real-time pitch monitoring, guided exercises, and advanced audio file analysis for personalized voice development.
 
-## 🎯 Features Overview
+##  Features Overview
 
-### 🎤 **Live Voice Training**
+### **Live Voice Training**
 - Real-time pitch monitoring with gentle feedback alerts
 - Progressive goal system that adapts to your improvement  
 - Advanced formant analysis for authentic voice feminization
 - Breathing pattern training and resonance quality detection
 - Auto-save progress with comprehensive trend analysis
 
-### 🏋️ **Voice Exercises & Warm-ups**
+### **Voice Exercises & Warm-ups**
 - Guided warm-up routines (5-minute beginner routine available)
 - Targeted exercises: humming, lip trills, pitch slides, straw phonation
 - Resonance shift training and breathing control exercises
 - Exercise progress tracking and completion rates
 
-### 🔬 **Audio File Pitch Analysis** *(NEW!)*
+### **Audio File Pitch Analysis** *(NEW!)*
 - Upload audio clips to analyze your voice pitch and characteristics
 - Get personalized training goal recommendations based on your actual voice
 - Track your progress by comparing recordings over time
 - Automatic goal setting from voice analysis results
 - Comprehensive voice quality metrics and femininity scoring
 
-### 📊 **Progress & Statistics**
+### **Progress & Statistics**
 - Detailed session statistics and performance trends
 - Weekly and long-term progress visualization
 - Goal achievement tracking and improvement analysis
 - Voice characteristic evolution over time
 
-### ⚙️ **Smart Configuration**
+### **Smart Configuration**
 - Voice preset system (MTF, FTM, Non-Binary options)
 - Adaptive goal progression based on your improvement
 - Customizable alert preferences and audio settings
@@ -57,7 +57,7 @@ A comprehensive voice training application featuring real-time pitch monitoring,
 3. **Try the audio analysis** - record a 5-10 second voice sample for personalized recommendations
 4. **Start training** with your customized goals
 
-## 📱 How to Use
+## How to Use
 
 ### Main Menu Navigation
 ```
@@ -68,7 +68,7 @@ A comprehensive voice training application featuring real-time pitch monitoring,
 5. Settings & Config       - Customize your training experience
 ```
 
-### 🔬 Audio File Pitch Analysis Guide
+### Audio File Pitch Analysis Guide
 
 #### **Getting Started**
 1. **Access the feature:** Main Menu → Option 3
@@ -111,7 +111,7 @@ A comprehensive voice training application featuring real-time pitch monitoring,
 3. **Set Goal from Analysis** - Choose from recent analyses as training goals
 4. **Analysis Summary** - Overview of your voice characteristics
 
-### 🎤 Live Training Session
+### Live Training Session
 1. **Start training:** Main Menu → Option 1 → Start Training
 2. **Speak naturally** - the app monitors your pitch in real-time
 3. **Follow visual feedback** - stay above your target frequency
@@ -121,13 +121,13 @@ A comprehensive voice training application featuring real-time pitch monitoring,
    - `pause` - Pause/resume training
    - `save` - Save current progress
 
-### 🏋️ Voice Exercises
+### Voice Exercises
 1. **Access exercises:** Main Menu → Option 2
 2. **Try the warm-up routine** (Option W) - great for beginners
 3. **Choose specific exercises** based on your needs
 4. **Follow on-screen instructions** and duration timers
 
-## 🎛️ Configuration & Settings
+## Configuration & Settings
 
 ### Voice Presets Available
 - **MTF (Male-to-Female)** - Feminine voice training
@@ -149,7 +149,7 @@ Settings & Configuration
 └── Clear Account Data         - Reset all progress and settings
 ```
 
-## 🎯 Frequency Reference
+## Frequency Reference
 
 ### Typical Vocal Ranges
 - **Masculine voice:** 85-180 Hz
@@ -159,14 +159,14 @@ Settings & Configuration
 
 *Note: Individual voices vary significantly. Use the audio analysis feature to find your optimal range.*
 
-## 📁 Application Files
+## Application Files
 
 The application creates and manages these files:
 - `data/voice_config.json` - Your settings and training goals
 - `data/voice_config_progress.json` - Session history and statistics
 - `data/voice_config_analysis_history.json` - Audio analysis results and history
 
-## 🛠️ Troubleshooting
+## Troubleshooting
 
 ### Audio Issues
 - **No microphone input:** Check microphone permissions and connections
@@ -183,7 +183,7 @@ The application creates and manages these files:
 - **Analysis fails:** Verify supported format, check for actual voice content
 - **Unexpected results:** Avoid background noise, multiple speakers, very short clips
 
-## 💡 Training Tips
+## Training Tips
 
 ### For Beginners
 1. **Start with audio analysis** - get personalized recommendations
@@ -203,7 +203,7 @@ The application creates and manages these files:
 - **Practice daily** - voice training requires consistent muscle memory development  
 - **Record regularly** - use audio analysis to track your progress objectively
 
-## 🔧 Technical Details
+## Technical Details
 
 - **Audio Processing:** 44.1 kHz sample rate, 4096 sample chunks
 - **Pitch Detection:** Autocorrelation and YIN algorithms
@@ -211,14 +211,7 @@ The application creates and manages these files:
 - **Real-time Processing:** Sub-100ms latency for live feedback
 - **Cross-platform:** Windows, macOS, Linux support
 
-## 🎨 Interface Design
-
-- **Clean terminal interface** - distraction-free training environment
-- **Intuitive navigation** - numbered menus and clear options
-- **Real-time feedback** - immediate visual and audio responses
-- **Progress visualization** - charts and statistics for motivation
-
-## 📄 License
+## License
 
 This application is provided for educational and personal use. Developed with care for the voice training community.
 
