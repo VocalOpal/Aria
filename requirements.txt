@@ -1,0 +1,9 @@
+numpy
+pyaudio
+scipy
+pygame
+matplotlib
+librosa
+soundfile
+pydub
+scikit-learn
