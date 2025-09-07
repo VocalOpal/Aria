@@ -40,16 +40,26 @@ A comprehensive voice training application featuring real-time pitch monitoring,
 
 ## 🚀 Quick Start
 
-### Installation
-1. **Install Python 3.7+** (3.9+ recommended)
-2. **Install dependencies in CMD**
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. **Run the application:**
-   ```bash
-   python main.py
-   ```
+### 🚀 Installation Guide
+
+1. **Install Python (version 3.7 or higher)**  
+   - If you don’t already have Python, download it from [python.org](https://www.python.org/downloads/).  
+   - We recommend **Python 3.9+** for the best experience.  
+2. **Open a Command Prompt (CMD)**  
+   - Navigate to the folder where you downloaded/cloned the project using:  
+     ```bash
+     cd path/to/your/project
+     ```
+3. **Install the required dependencies**  
+   - Run the following command in CMD:  
+     ```bash
+     pip install -r requirements.txt
+     ```
+4. **Start the application** 🎉  
+   - Once everything is installed, launch the app with:  
+     ```bash
+     python main.py
+     ```
 
 ### First-Time Setup
 1. **Launch the app** - you'll be guided through initial setup
