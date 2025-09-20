@@ -487,7 +487,7 @@ class VoiceMenuCoordinator:
         self.ui.wait_for_enter()
     
     def _show_achievements(self):
-        """Show comprehensive achievements, milestones, and streak tracking"""
+        """Show achievements, milestones, and streak tracking"""
         if not self.session_manager:
             self.ui.print_info("Session manager not available")
             self.ui.wait_for_enter()
@@ -519,7 +519,7 @@ class VoiceMenuCoordinator:
             elif choice == '4':  # Alert Preferences
                 self._show_alert_preferences()
             elif choice == '5':  # Advanced Options
-                self._handle_advanced_settings()
+                self._handle_technical_settings()
             elif choice == '6':  # Voice Safety & Wellness
                 if self.safety_coordinator:
                     self.safety_coordinator.show_voice_safety_menu(self.menu_system)
@@ -593,7 +593,7 @@ class VoiceMenuCoordinator:
     def _adjust_target_pitch(self):
         """Adjust target pitch settings"""
         if self.config_manager:
-            current_value = self.config_manager.config.get('threshold_hz', 165)
+            current_value = self.config_manager.config.get('current_goal', 165)
             new_value = self.config_manager.adjust_threshold(current_value)
             if new_value != current_value:
                 self.ui.print_success(f"Target pitch updated to {new_value} Hz")
@@ -621,10 +621,10 @@ class VoiceMenuCoordinator:
         print("Most users find the default settings work well!")
         self.ui.wait_for_enter("Press Enter to return to settings...")
     
-    def _handle_advanced_settings(self):
-        """Handle advanced settings menu"""
+    def _handle_technical_settings(self):
+        """Handle technical settings menu"""
         while True:
-            choice = self.menu_system.show_advanced_settings_menu()
+            choice = self.menu_system.show_technical_settings_menu()
             
             if choice == '0':
                 break
@@ -652,15 +652,15 @@ class VoiceMenuCoordinator:
         print("\nThese settings control background noise filtering.")
         print("Lower values = more sensitive to quiet sounds")
         print("Higher values = ignore more background noise")
-        self.ui.wait_for_enter("Press Enter to return to advanced settings...")
+        self.ui.wait_for_enter("Press Enter to return to technical settings...")
     
     def _show_alert_settings(self):
         """Show alert configuration"""
         self.ui.clear_screen()
         print("[ Alert Configuration ]")
         print("Alert settings control the beep sounds.")
-        print("Volume and timing are automatically optimized for voice training.")
-        self.ui.wait_for_enter("Press Enter to return to advanced settings...")
+        print("Volume and timing are set to work well for voice training.")
+        self.ui.wait_for_enter("Press Enter to return to technical settings...")
     
     def _show_ui_display_settings(self):
         """Configure UI display settings"""
@@ -695,7 +695,7 @@ class VoiceMenuCoordinator:
             print("1. Toggle display mode (Exact ↔ Smooth)")
             print("2. Adjust range size (5-20 Hz)")
             print("3. Adjust alert warning time (2-10s)")
-            print("0. Back to advanced settings")
+            print("0. Back to technical settings")
             
             choice = input("\nChoice: ").strip()
             

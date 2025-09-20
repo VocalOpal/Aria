@@ -5,9 +5,11 @@ Extracted from voice_trainer.py lines 319-457, 904-998
 
 import json
 import os
+from pathlib import Path
 import numpy as np
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional
 from datetime import datetime
+from utils.file_operations import safe_save_config, safe_load_config, get_logger
 
 
 class VoiceConfigurationManager:
@@ -18,7 +20,6 @@ class VoiceConfigurationManager:
         
         # Default configuration
         self.default_config = {
-            'threshold_hz': 165,
             'base_goal': 165,
             'current_goal': 165,
             'goal_increment': 3,
@@ -41,33 +42,36 @@ class VoiceConfigurationManager:
         
         # Current configuration
         self.config = self.default_config.copy()
-        
+
+        # Initialize logger
+        self.logger = get_logger()
+
         # Load existing configuration
         self.load_config()
     
     def load_config(self) -> bool:
-        """Load configuration from file"""
-        if os.path.exists(self.config_file):
-            try:
-                with open(self.config_file, 'r') as f:
-                    stored_config = json.load(f)
-                    self.config.update(stored_config)
-                return True
-            except Exception as e:
-                print(f"Error loading config: {e}")
-                return False
-        return False
-    
-    def save_config(self) -> bool:
-        """Save current configuration to file"""
+        """Load configuration from file using safe operations"""
         try:
-            # Ensure directory exists
-            os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
-            
-            with open(self.config_file, 'w') as f:
-                json.dump(self.config, f, indent=2)
+            config_data = safe_load_config(self.config_file, self.default_config)
+            self.config.update(config_data)
+            self.logger.info(f"Configuration loaded from {self.config_file}")
             return True
         except Exception as e:
+            self.logger.error(f"Error loading config: {e}")
+            print(f"Error loading config: {e}")
+            return False
+    
+    def save_config(self) -> bool:
+        """Save current configuration to file using atomic operations"""
+        try:
+            success = safe_save_config(self.config, self.config_file)
+            if success:
+                self.logger.info(f"Configuration saved to {self.config_file}")
+            else:
+                self.logger.error(f"Failed to save configuration to {self.config_file}")
+            return success
+        except Exception as e:
+            self.logger.error(f"Error saving config: {e}")
             print(f"Error saving config: {e}")
             return False
     
@@ -158,7 +162,7 @@ class VoiceConfigurationManager:
         
         # Ensure goal stays within safe ranges
         self.config['current_goal'] = max(80, min(350, self.config['current_goal']))
-        self.config['threshold_hz'] = self.config['current_goal']
+        # threshold_hz is now unified with current_goal
         
         # Save updated goal
         self.save_config()
@@ -234,7 +238,7 @@ class VoiceConfigurationManager:
             new_value = input("Enter new threshold (Hz) or press Enter to cancel: ").strip()
             if new_value:
                 value = float(new_value)
-                self.config['threshold_hz'] = value
+                # threshold_hz is now unified with current_goal
                 self.config['current_goal'] = value
                 self.save_config()
                 return value

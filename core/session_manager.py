@@ -7,9 +7,11 @@ import numpy as np
 import time
 import json
 import os
+from pathlib import Path
 from collections import deque
 from datetime import datetime
 import statistics
+from utils.file_operations import safe_save_config, safe_load_config, get_logger
 
 
 class VoiceSessionManager:
@@ -86,7 +88,7 @@ class VoiceSessionManager:
             self.current_session = None
         return True
     
-    def update_session_stats(self, pitch, threshold_hz, current_goal):
+    def update_session_stats(self, pitch, min_threshold, current_goal):
         """Update session statistics with new pitch data"""
         if pitch > 0:
             # Update basic stats
@@ -105,7 +107,7 @@ class VoiceSessionManager:
                 )
             
             # Track range achievements
-            if pitch >= threshold_hz:
+            if pitch >= min_threshold:
                 self.session_stats['time_in_range'] += 1
             
             if pitch >= current_goal:
@@ -141,7 +143,7 @@ class VoiceSessionManager:
                 return "timer_resumed"
             return "timer_active"
     
-    def check_dip_tolerance(self, pitch, threshold_hz, dip_tolerance_duration):
+    def check_dip_tolerance(self, pitch, min_threshold, dip_tolerance_duration):
         """Check if current pitch dip should trigger alert"""
         self.pitch_buffer.append(pitch)
         
@@ -152,7 +154,7 @@ class VoiceSessionManager:
             
         current_time = time.time()
         
-        if recent_median < (threshold_hz - 15):  # 15Hz below goal triggers dip
+        if recent_median < (min_threshold - 15):  # 15Hz below goal triggers dip
             if not self.in_dip:
                 self.in_dip = True
                 self.dip_start_time = current_time

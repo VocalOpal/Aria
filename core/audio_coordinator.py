@@ -4,6 +4,7 @@ Extracted from voice_trainer.py lines 1260-1453 (audio analysis functionality)
 """
 
 import os
+import json
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
@@ -98,12 +99,12 @@ class VoiceAudioAnalyzerCoordinator:
                 self.ui.wait_for_enter()
                 return True
                 
-            except Exception as e:
+            except (ValueError, RuntimeError, FileNotFoundError) as e:
                 self.ui.print_error(f"Analysis failed: {e}")
                 self.ui.wait_for_enter()
                 return False
-                
-        except Exception as e:
+
+        except (OSError, PermissionError, ValueError) as e:
             self.ui.print_error(f"Error: {e}")
             self.ui.wait_for_enter()
             return False
@@ -286,7 +287,7 @@ class VoiceAudioAnalyzerCoordinator:
                     'result': analysis_result
                 })
                 
-            except Exception as e:
+            except (ValueError, RuntimeError, FileNotFoundError, OSError) as e:
                 results['failed'].append({
                     'file': file_path,
                     'error': str(e)
@@ -313,7 +314,7 @@ class VoiceAudioAnalyzerCoordinator:
             
             return True
             
-        except Exception as e:
+        except (OSError, PermissionError, json.JSONEncodeError) as e:
             print(f"Error exporting analysis history: {e}")
             return False
     
@@ -326,7 +327,7 @@ class VoiceAudioAnalyzerCoordinator:
             self.pitch_goal_manager.analysis_history = []
             self.pitch_goal_manager.save_analysis_history()
             return True
-        except Exception as e:
+        except (OSError, PermissionError) as e:
             print(f"Error clearing analysis history: {e}")
             return False
     

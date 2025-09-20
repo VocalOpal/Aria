@@ -1,5 +1,5 @@
 """
-Achievement System - Comprehensive achievement and streak tracking for voice training
+Achievement System - Achievement and streak tracking for voice training
 Handles all achievement logic, streak calculations, and motivational notifications
 """
 
@@ -36,8 +36,8 @@ class VoiceAchievementSystem:
                     else:
                         date = datetime.fromisoformat(date_str).date()
                     session_dates.append(date)
-            except:
-                continue
+            except (ValueError, AttributeError, TypeError):
+                continue  # Skip invalid date entries
         
         if not session_dates:
             return {'current_streak': 0, 'best_streak': 0, 'streak_days': []}
@@ -148,7 +148,7 @@ class VoiceAchievementSystem:
     
     def get_all_achievements(self, total_sessions: int, total_time: float, 
                            streak_info: Dict, pitch_data: Dict, sessions: List[Dict]) -> List[Dict]:
-        """Get comprehensive list of all achievements with earned status"""
+        """Get list of all achievements with earned status"""
         achievements = []
         
         # Session count achievements
@@ -326,13 +326,13 @@ class VoiceAchievementSystem:
         print()
     
     def display_achievements_summary(self, sessions: List[Dict]):
-        """Display comprehensive achievements summary"""
+        """Display achievements summary"""
         if not sessions:
             print("🌱 Start training to unlock achievements!")
             self._show_upcoming_achievements()
             return
         
-        # Calculate comprehensive statistics
+        # Calculate overall statistics
         total_sessions = len(sessions)
         total_time = sum(s.get('duration_minutes', 0) for s in sessions)
         
@@ -424,5 +424,5 @@ class VoiceAchievementSystem:
                 date = datetime.fromisoformat(date_str).date()
             
             return (datetime.now().date() - date).days <= days
-        except:
+        except (ValueError, AttributeError, TypeError):
             return False

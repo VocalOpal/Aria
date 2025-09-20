@@ -201,7 +201,7 @@ class VoiceTrainingController:
             try:
                 # Simplified config for exercises
                 config = {
-                    'threshold_hz': 165,
+                    'current_goal': 165,
                     'current_goal': 165,
                     'sensitivity': 1.0,
                     'vad_threshold': 0.01,
@@ -215,7 +215,7 @@ class VoiceTrainingController:
         return audio_callback
     
     def _process_audio_data(self, audio_data, config: Dict[str, Any], ui_callback: Callable, session_type: str):
-        """Process audio data with enhanced noise handling and analysis"""
+        """Process audio data with noise handling and analysis"""
         if not self.analyzer:
             return
         
@@ -263,9 +263,9 @@ class VoiceTrainingController:
             return
         
         # Update session statistics
-        threshold_hz = config.get('threshold_hz', 165)
+        min_threshold = config.get('current_goal', 165)  # Use current_goal as the minimum threshold
         current_goal = config.get('current_goal', 165)
-        self.session_manager.update_session_stats(pitch, threshold_hz, current_goal)
+        self.session_manager.update_session_stats(pitch, min_threshold, current_goal)
         
         # Skip heavy analysis if paused
         if self.pause_training:
@@ -296,12 +296,12 @@ class VoiceTrainingController:
         
         # Check dip tolerance and alerts
         dip_tolerance_duration = config.get('dip_tolerance_duration', 5.0)
-        should_alert, dip_info = self.session_manager.check_dip_tolerance(pitch, threshold_hz, dip_tolerance_duration)
+        should_alert, dip_info = self.session_manager.check_dip_tolerance(pitch, min_threshold, dip_tolerance_duration)
         
         # Prepare status information for UI
         status_info = {
             'pitch': pitch,
-            'goal_hz': threshold_hz,
+            'goal_hz': min_threshold,
             'current_goal': current_goal,
             'resonance_quality': self.resonance_quality,
             'dip_info': dip_info,
