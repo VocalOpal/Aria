@@ -1,8 +1,3 @@
-"""
-Voice Trainer - Main coordinator for voice training components
-Refactored from monolithic 1700+ line class to clean, modular architecture
-"""
-
 import sys
 import builtins
 
