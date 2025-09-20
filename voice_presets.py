@@ -1,8 +1,3 @@
-"""
-Voice training presets for different user needs
-Provides frequency target suggestions for FTM, MTF, and non-binary users
-"""
-
 import json
 import os
 from typing import Dict, Any, Optional
