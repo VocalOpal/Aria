@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Aria Voice Studio v4.1
 Voice training application
