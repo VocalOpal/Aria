@@ -1,7 +1,3 @@
-"""
-Core components package for voice training application
-"""
-
 from .session_manager import VoiceSessionManager
 from .training_controller import VoiceTrainingController
 from .configuration_manager import VoiceConfigurationManager
