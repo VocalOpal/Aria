@@ -1,7 +1,3 @@
-"""
-Achievement System - Achievement and streak tracking for voice training
-Handles all achievement logic, streak calculations, and motivational notifications
-"""
 
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
