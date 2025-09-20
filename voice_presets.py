@@ -130,7 +130,7 @@ class VoicePresets:
         
         updated_config = current_config.copy()
         updated_config.update({
-            'threshold_hz': preset['base_frequency'],
+            'current_goal': preset['base_frequency'],
             'base_goal': preset['base_frequency'], 
             'target_goal': preset['target_frequency'],
             'goal_increment': preset['goal_increment'],
@@ -243,7 +243,7 @@ class FirstTimeUserSetup:
     def create_initial_config(self, preset_name: str) -> Dict[str, Any]:
         """Create initial configuration with selected preset"""
         base_config = {
-            'threshold_hz': 165,
+            'current_goal': 165,
             'sensitivity': 1.0,
             'vad_threshold': 0.01,
             'noise_threshold': 0.02,

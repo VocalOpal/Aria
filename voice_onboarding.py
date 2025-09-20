@@ -24,7 +24,7 @@ class OnboardingWizard:
             with open(self.config_file, 'r') as f:
                 config = json.load(f)
                 return not config.get('onboarding_completed', False)
-        except:
+        except (json.JSONDecodeError, FileNotFoundError, PermissionError, OSError):
             return True
             
     def start_onboarding(self):
@@ -305,7 +305,7 @@ class OnboardingWizard:
         else:
             # Default configuration for general/unsure users
             config = {
-                'threshold_hz': 165,
+                'current_goal': 165,
                 'base_goal': 165,
                 'goal_increment': 3,
                 'sensitivity': 1.0,
@@ -360,7 +360,7 @@ class OnboardingWizard:
         
         print(f"🎯 Voice Goal: {goal_desc}")
         print(f"📚 Experience: {experience_desc}")
-        print(f"🎤 Target Frequency: {config['threshold_hz']} Hz")
+        print(f"🎤 Target Frequency: {config['current_goal']} Hz")
         print(f"📈 Progression: {config['goal_increment']} Hz steps")
         
         if self.user_responses.get('mic_type'):

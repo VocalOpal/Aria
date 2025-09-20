@@ -156,3 +156,8 @@ data/*_config_analysis_history.json
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Application logs and runtime files
+logs/
+*.log
+data/backups/

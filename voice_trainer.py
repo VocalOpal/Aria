@@ -1,55 +1,15 @@
 """
-Voice Trainer - Lightweight orchestrator for voice training components
+Voice Trainer - Main coordinator for voice training components
 Refactored from monolithic 1700+ line class to clean, modular architecture
 """
 
 import sys
 import builtins
 
-# Fix Unicode encoding issues on Windows
-def safe_print(*args, **kwargs):
-    """Print function that handles Unicode encoding gracefully"""
-    try:
-        builtins.__print__(*args, **kwargs)
-    except UnicodeEncodeError:
-        # Convert args to ASCII-friendly versions
-        safe_args = []
-        for arg in args:
-            if isinstance(arg, str):
-                # Replace common emoji with ASCII equivalents
-                arg = (arg.replace('🎉', '[CELEBRATION]')
-                        .replace('🌱', '[SEEDLING]')  
-                        .replace('🎯', '[TARGET]')
-                        .replace('⏰', '[TIME]')
-                        .replace('🔔', '[BELL]')
-                        .replace('⏱️', '[TIMER]')
-                        .replace('💭', '[THOUGHT]')
-                        .replace('🎤', '[MIC]')
-                        .replace('💪', '[STRONG]')
-                        .replace('🔥', '[FIRE]')
-                        .replace('⭐', '[STAR]')
-                        .replace('🕐', '[CLOCK]')
-                        .replace('📅', '[CALENDAR]')
-                        .replace('📊', '[CHART]')
-                        .replace('✅', '[CHECK]')
-                        .replace('🏆', '[TROPHY]')
-                        .replace('❌', '[X]')
-                        .replace('⚠️', '[WARNING]')
-                        .replace('🚨', '[ALERT]')
-                        .replace('✨', '[SPARKLES]')
-                        .replace('📚', '[BOOKS]')
-                        .replace('🎙️', '[STUDIO_MIC]')
-                        .replace('🔊', '[SPEAKER]')
-                        .replace('💡', '[BULB]')
-                        .replace('🛡️', '[SHIELD]')
-                        .replace('📱', '[PHONE]')
-                        .replace('🎧', '[HEADPHONES]')
-                        .replace('↑', '^')
-                        .replace('↓', 'v'))
-            safe_args.append(arg)
-        builtins.__print__(*safe_args, **kwargs)
+# Safe emoji handler to prevent crashes on different terminals
+from utils.emoji_handler import safe_print
 
-# Store original print function and replace it
+# Store original print function and replace it globally
 builtins.__print__ = builtins.print
 builtins.print = safe_print
 
@@ -60,11 +20,12 @@ from core.configuration_manager import VoiceConfigurationManager
 from core.audio_coordinator import VoiceAudioAnalyzerCoordinator
 from core.safety_coordinator import VoiceSafetyCoordinator
 from core.menu_coordinator import VoiceMenuCoordinator
+from core.error_handler import log_error
 from voice_ui import TerminalUI, MenuSystem
 
 
 class VoiceTrainer:
-    """Lightweight orchestrator for voice training components"""
+    """Main coordinator for voice training components"""
     
     def __init__(self, config_file="data/voice_config.json"):
         # Initialize component factory
@@ -86,6 +47,9 @@ class VoiceTrainer:
         
         # Wire up dependencies
         self._initialize_dependencies()
+
+        # Validate all dependencies are properly wired
+        self._validate_system_integrity()
         
     def _initialize_dependencies(self):
         """Initialize and wire up all component dependencies"""
@@ -139,7 +103,47 @@ class VoiceTrainer:
             audio_coordinator=self.audio_coordinator,
             safety_coordinator=self.safety_coordinator
         )
-    
+
+    def _validate_system_integrity(self):
+        """Validate that all critical components are properly initialized and connected"""
+        from utils.file_operations import get_logger
+        logger = get_logger()
+
+        # Check core components
+        critical_components = [
+            ('ui', self.ui),
+            ('menu_system', self.menu_system),
+            ('config_manager', self.config_manager),
+            ('session_manager', self.session_manager),
+            ('training_controller', self.training_controller),
+            ('audio_coordinator', self.audio_coordinator),
+            ('safety_coordinator', self.safety_coordinator),
+            ('menu_coordinator', self.menu_coordinator),
+            ('factory', self.factory)
+        ]
+
+        missing_components = []
+        for name, component in critical_components:
+            if component is None:
+                missing_components.append(name)
+
+        if missing_components:
+            error_msg = f"Critical components not initialized: {', '.join(missing_components)}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
+        # Test component factory dependencies
+        try:
+            test_components = ['voice_analyzer', 'audio_manager', 'alert_system']
+            for comp_name in test_components:
+                component = self.factory.get_component(comp_name)
+                if component is None:
+                    raise RuntimeError(f"Factory failed to create {comp_name}")
+            logger.info("System integrity validation passed")
+        except Exception as e:
+            logger.error(f"System integrity validation failed: {e}")
+            raise RuntimeError(f"System integrity validation failed: {e}") from e
+
     def run(self):
         """Main application entry point"""
         try:
@@ -159,8 +163,16 @@ class VoiceTrainer:
                 
         except KeyboardInterrupt:
             print("\n\nExiting Aria Voice Studio...")
+        except RuntimeError as e:
+            # System integrity or critical component errors
+            print(f"System error: {e}")
+            print("The application cannot continue. Please check your installation.")
         except Exception as e:
+            from utils.file_operations import get_logger
+            logger = get_logger()
+            logger.error(f"Unexpected error in main application: {e}")
             print(f"Unexpected error: {e}")
+            print("Please check the log files for more details.")
         finally:
             self.cleanup()
     
@@ -211,11 +223,7 @@ class VoiceTrainer:
             print(f"Cleanup error: {e}")
 
 
-# Backward compatibility functions for existing code
-def lazy_init(func):
-    """Backward compatibility decorator"""
-    from utils.lazy_loader import lazy_property
-    return lazy_property(func)
+# Backward compatibility removed - use utils.lazy_loader directly
 
 
 if __name__ == "__main__":

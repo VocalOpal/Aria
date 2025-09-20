@@ -2,16 +2,16 @@
 
 **Your voice, your journey, your authentic self**
 
-A comprehensive voice training application featuring real-time pitch monitoring, guided exercises, and advanced audio file analysis for personalized voice development.
+A voice training app with real-time pitch monitoring, guided exercises, and audio file analysis to help you develop your authentic voice.
 
 ##  Features Overview
 
 ### **Live Voice Training**
 - Real-time pitch monitoring with gentle feedback alerts
 - Progressive goal system that adapts to your improvement  
-- Advanced formant analysis for authentic voice feminization
+- Voice resonance analysis to help develop authentic sound
 - Breathing pattern training and resonance quality detection
-- Auto-save progress with comprehensive trend analysis
+- Auto-save progress with detailed tracking over time
 
 ### **Voice Exercises & Warm-ups**
 - Guided warm-up routines (5-minute beginner routine available)
@@ -24,7 +24,7 @@ A comprehensive voice training application featuring real-time pitch monitoring,
 - Get personalized training goal recommendations based on your actual voice
 - Track your progress by comparing recordings over time
 - Automatic goal setting from voice analysis results
-- Comprehensive voice quality metrics and femininity scoring
+- Voice quality metrics and optional femininity scoring
 
 ### **Progress & Statistics**
 - Detailed session statistics and performance trends
@@ -158,7 +158,7 @@ Settings & Configuration
 ├── Target Pitch Settings       - Customize frequency thresholds  
 ├── Microphone & Audio         - Audio input and sensitivity
 ├── Alert Preferences          - Notification sounds and timing
-├── Advanced Options           - Fine-tune technical parameters
+├── Technical Options          - Fine-tune audio and detection settings
 ├── Save Configuration         - Persist your settings
 └── Clear Account Data         - Reset all progress and settings
 ```
@@ -205,7 +205,7 @@ The application creates and manages these files:
 3. **Begin with exercises** - try the 5-minute warm-up routine
 4. **Practice consistently** - short, frequent sessions work best
 
-### Advanced Training
+### Experienced Users
 1. **Track your progress** - use the analysis history to monitor improvement
 2. **Adjust goals progressively** - increase targets as you improve
 3. **Focus on consistency** - stability is as important as pitch
@@ -220,8 +220,8 @@ The application creates and manages these files:
 ## Technical Details
 
 - **Audio Processing:** 44.1 kHz sample rate, 4096 sample chunks
-- **Pitch Detection:** Autocorrelation and YIN algorithms
-- **Analysis Engine:** librosa with advanced spectral analysis  
+- **Pitch Detection:** Autocorrelation and YIN methods
+- **Analysis Engine:** librosa with spectral analysis  
 - **Real-time Processing:** Sub-100ms latency for live feedback
 - **Cross-platform:** Windows, macOS, Linux support
 
@@ -231,4 +231,4 @@ This application is provided for educational and personal use. Developed with ca
 
 ---
 
-**Need help?** The application includes comprehensive help text and guided setup. Each menu provides detailed instructions and tips for effective voice training.
+**Need help?** The app includes detailed help text and guided setup. Each menu has instructions and tips for effective voice training.

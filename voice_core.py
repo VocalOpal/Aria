@@ -4,12 +4,9 @@ import threading
 import time
 from scipy.signal import find_peaks, butter, filtfilt, welch
 import pygame
-import json
-import os
 from collections import deque
-from datetime import datetime, timedelta
+from datetime import datetime
 from scipy.ndimage import gaussian_filter1d
-import statistics
 
 class VoiceAnalyzer:
     """Core voice analysis and detection functionality"""
@@ -20,7 +17,7 @@ class VoiceAnalyzer:
         self.FORMAT = pyaudio.paFloat32
         self.CHANNELS = 1
         
-        # Performance optimizations
+        # Skip heavy analysis to keep things responsive
         self._analysis_skip_counter = 0
         self._analysis_skip_interval = 2  # Skip heavy analysis every N frames
         self._last_heavy_analysis = 0
@@ -31,7 +28,7 @@ class VoiceAnalyzer:
         self.MIN_FREQ = 50
         self.MAX_FREQ = 400
         
-        # Enhanced noise suppression with user feedback
+        # Learning background noise to clean up audio
         self.noise_profile = None
         self.noise_samples = deque(maxlen=200)
         self.learning_noise = True
@@ -48,7 +45,7 @@ class VoiceAnalyzer:
         self.recent_energy = deque(maxlen=10)
         
     def apply_noise_suppression(self, audio_data):
-        """Apply optimized noise suppression"""
+        """Remove background noise from voice input"""
         if self.noise_profile is None or len(self.noise_profile) == 0:
             return audio_data
 
@@ -58,7 +55,8 @@ class VoiceAnalyzer:
         try:
             b, a = butter(3, low_cutoff, btype='high')
             filtered = filtfilt(b, a, audio_data, method="gust")
-        except:
+        except (ValueError, RuntimeError) as e:
+            # Fallback if filter fails - log but continue
             filtered = audio_data
 
         # Adaptive noise gating
@@ -142,7 +140,7 @@ class VoiceAnalyzer:
         return is_background
 
     def is_voice_active(self, audio_data, vad_threshold=0.01, sensitivity=1.0):
-        """Voice activity detection with optimized analysis"""
+        """Check if there's actual voice in the audio"""
         adjusted_energy = self._calculate_audio_energy(audio_data, sensitivity)
         self.recent_energy.append(adjusted_energy / sensitivity)  # Store raw energy
         
@@ -153,7 +151,7 @@ class VoiceAnalyzer:
         return speech_ratio > 0.3 and adjusted_energy > float(vad_threshold)
 
     def detect_pitch(self, audio_data):
-        """CPU-optimized pitch detection using autocorrelation"""
+        """Find the fundamental frequency using autocorrelation"""
         cleaned_audio = self.apply_noise_suppression(audio_data)
 
         # More aggressive size reduction for CPU optimization
@@ -311,6 +309,9 @@ class AudioManager:
             )
             return True
         except Exception as e:
+            # Clean up if partially initialized
+            self._cleanup_partial_audio_init()
+
             error_msg = str(e).lower()
             print(f"Error initializing audio system: {e}")
             print("\n--- Troubleshooting Tips ---")
@@ -333,6 +334,21 @@ class AudioManager:
             
             print("• If problems persist, try restarting your computer")
             return False
+
+    def _cleanup_partial_audio_init(self):
+        """Clean up partial audio initialization"""
+        if hasattr(self, 'stream') and self.stream:
+            try:
+                self.stream.close()
+            except:
+                pass
+            self.stream = None
+        if hasattr(self, 'audio') and self.audio:
+            try:
+                self.audio.terminate()
+            except:
+                pass
+            self.audio = None
             
     def start_processing(self, callback):
         """Start audio processing in background thread"""
@@ -349,13 +365,18 @@ class AudioManager:
         """Audio processing loop"""
         while self.running:
             try:
-                data = self.stream.read(self.analyzer.CHUNK, exception_on_overflow=False)
+                try:
+                    data = self.stream.read(self.analyzer.CHUNK, exception_on_overflow=False)
+                except TypeError:
+                    # Fallback for PyAudio < 0.2.11
+                    data = self.stream.read(self.analyzer.CHUNK)
+
                 if not data:
                     continue
-                    
+
                 audio_data = np.frombuffer(data, dtype=np.float32)
                 callback(audio_data)
-                
+
             except Exception as e:
                 if self.running:
                     print(f"Audio processing error: {e}")
@@ -382,6 +403,9 @@ class AudioManager:
             
         if self.audio_thread and self.audio_thread.is_alive():
             self.audio_thread.join(timeout=1.0)
+            if self.audio_thread.is_alive():
+                # Log warning about thread not terminating properly
+                print("Warning: Audio thread did not terminate cleanly")
         self.audio_thread = None
 
 
@@ -472,13 +496,7 @@ class AlertSystem:
         except Exception as e:
             print(f"Error playing high alert: {e}")
             
-    def play_alert(self):
-        """Backward compatibility - plays low alert"""
-        self.play_low_alert()
-        
-    def set_high_pitch_threshold(self, threshold):
-        """Set the threshold for high pitch alerts"""
-        self.high_pitch_threshold = max(200, min(500, threshold))  # Allow up to 500Hz for MTF training
+    # Removed unused backward compatibility methods
             
     def cleanup(self):
         """Cleanup pygame mixer"""

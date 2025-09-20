@@ -1,12 +1,11 @@
 import numpy as np
 import librosa
-import soundfile as sf
 from pathlib import Path
 import json
 import os
 from typing import Dict, List, Tuple, Optional
 from datetime import datetime
-import statistics
+from scipy.signal import find_peaks
 
 class AudioFileAnalyzer:
     """Analyze pitch and Hz characteristics of uploaded audio files"""
@@ -30,38 +29,10 @@ class AudioFileAnalyzer:
         except Exception as e:
             raise ValueError(f"Could not load audio file: {e}")
             
-    def extract_pitch_contour(self, audio_data: np.ndarray, sr: int) -> Tuple[np.ndarray, np.ndarray]:
-        """Extract pitch contour from audio using librosa's piptrack"""
-        try:
-            # Use piptrack for pitch detection
-            pitches, magnitudes = librosa.piptrack(y=audio_data, sr=sr, 
-                                                 hop_length=self.hop_length,
-                                                 fmin=50, fmax=400)
-            
-            # Extract the most prominent pitch at each frame
-            pitch_contour = []
-            times = librosa.frames_to_time(np.arange(pitches.shape[1]), 
-                                         sr=sr, hop_length=self.hop_length)
-            
-            for t in range(pitches.shape[1]):
-                index = magnitudes[:, t].argmax()
-                pitch = pitches[index, t]
-                
-                # Only keep pitches with sufficient magnitude and reasonable values
-                if magnitudes[index, t] > 0.1 and 50 <= pitch <= 400:
-                    pitch_contour.append(pitch)
-                else:
-                    pitch_contour.append(0.0)
-                    
-            return np.array(pitch_contour), times
-            
-        except Exception as e:
-            raise ValueError(f"Could not extract pitch: {e}")
-            
     def analyze_fundamental_frequency(self, audio_data: np.ndarray, sr: int) -> Dict:
-        """Analyze fundamental frequency characteristics using multiple methods"""
+        """Find pitch characteristics of the audio"""
         try:
-            # Method 1: Using librosa's yin algorithm (more accurate for voice)
+            # Use librosa's yin method (works better for voice)
             f0_yin = librosa.yin(audio_data, fmin=50, fmax=400, 
                                sr=sr, hop_length=self.hop_length)
             
@@ -137,7 +108,8 @@ class AudioFileAnalyzer:
                 'f2_f1_ratio': formant_estimates.get('f2_f1_ratio', 0.0)
             }
             
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError) as e:
+            # Handle expected computation errors gracefully
             return {
                 'spectral_centroid_mean': 0.0,
                 'spectral_centroid_std': 0.0,
@@ -166,7 +138,6 @@ class AudioFileAnalyzer:
                 return {'f1': 0.0, 'f2': 0.0, 'f2_f1_ratio': 0.0}
             
             # Find peaks in spectrum
-            from scipy.signal import find_peaks
             peaks, _ = find_peaks(formant_magnitudes, height=np.max(formant_magnitudes) * 0.3, distance=10)
             
             if len(peaks) >= 2:
@@ -195,7 +166,8 @@ class AudioFileAnalyzer:
             
             return {'f1': 0.0, 'f2': 0.0, 'f2_f1_ratio': 0.0}
             
-        except Exception:
+        except (ImportError, ValueError, IndexError) as e:
+            # Handle scipy import issues or array processing errors
             return {'f1': 0.0, 'f2': 0.0, 'f2_f1_ratio': 0.0}
     
     def analyze_voice_quality(self, audio_data: np.ndarray, sr: int) -> Dict:
@@ -218,7 +190,8 @@ class AudioFileAnalyzer:
                 'voice_quality_score': self._calculate_voice_quality_score(rms, zcr)
             }
             
-        except Exception:
+        except (ValueError, TypeError, AttributeError) as e:
+            # Handle computation errors in voice quality analysis
             return {
                 'rms_energy_mean': 0.0,
                 'rms_energy_std': 0.0,
@@ -235,7 +208,7 @@ class AudioFileAnalyzer:
             zcr_score = min(1.0, np.mean(zcr) / 0.1)  # Normalize ZCR
             
             return float((rms_consistency + zcr_score) / 2.0)
-        except Exception:
+        except (ValueError, ZeroDivisionError, TypeError):
             return 0.0
     
     def full_analysis(self, file_path: str) -> Dict:
@@ -276,8 +249,12 @@ class AudioFileAnalyzer:
             
             return analysis_results
             
+        except (FileNotFoundError, OSError) as e:
+            raise FileNotFoundError(f"Analysis failed - file issue: {e}")
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Analysis failed - data processing error: {e}")
         except Exception as e:
-            raise ValueError(f"Analysis failed: {e}")
+            raise RuntimeError(f"Analysis failed - unexpected error: {e}")
     
     def _generate_analysis_summary(self, pitch_analysis: Dict, spectral_analysis: Dict) -> Dict:
         """Generate a summary assessment of the voice sample"""
@@ -327,7 +304,8 @@ class AudioFileAnalyzer:
                 'recommended_target_high': min(400, int(mean_pitch + 20)) if mean_pitch > 0 else 185
             }
             
-        except Exception:
+        except (ValueError, KeyError, TypeError) as e:
+            # Handle issues with summary calculation
             return {
                 'overall_score': 0.0,
                 'pitch_femininity_score': 0.0,
@@ -356,7 +334,7 @@ class PitchGoalManager:
             if os.path.exists(self.analysis_history_file):
                 with open(self.analysis_history_file, 'r') as f:
                     self.analysis_history = json.load(f)
-        except Exception:
+        except (FileNotFoundError, json.JSONDecodeError, PermissionError):
             self.analysis_history = []
     
     def save_analysis_history(self):
@@ -364,7 +342,7 @@ class PitchGoalManager:
         try:
             with open(self.analysis_history_file, 'w') as f:
                 json.dump(self.analysis_history, f, indent=2)
-        except Exception as e:
+        except (OSError, PermissionError, json.JSONEncodeError) as e:
             print(f"Warning: Could not save analysis history: {e}")
     
     def add_analysis_result(self, analysis_result: Dict, set_as_goal: bool = False):
@@ -397,11 +375,11 @@ class PitchGoalManager:
                 try:
                     with open(self.config_file, 'r') as f:
                         config = json.load(f)
-                except Exception:
+                except (FileNotFoundError, json.JSONDecodeError, PermissionError):
                     pass
             
             # Update goal settings
-            config['threshold_hz'] = target_low
+            # threshold_hz is now unified with current_goal
             config['current_goal'] = target_low
             config['base_goal'] = target_low
             config['target_range'] = [target_low, target_high]
@@ -418,7 +396,7 @@ class PitchGoalManager:
                 
             return target_low, target_high
             
-        except Exception as e:
+        except (OSError, PermissionError, json.JSONEncodeError) as e:
             print(f"Warning: Could not set goal from analysis: {e}")
             return None, None
     
@@ -453,5 +431,5 @@ class PitchGoalManager:
                 ]
             }
             
-        except Exception:
+        except (KeyError, ValueError, TypeError) as e:
             return {'count': len(self.analysis_history), 'message': 'Error processing history'}

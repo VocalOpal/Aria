@@ -16,36 +16,7 @@ def supports_unicode():
 
 UNICODE_SUPPORT = supports_unicode()
 
-# Emoji fallback for systems that don't support Unicode
-def safe_print(text):
-    """Print text with Unicode fallback"""
-    if not UNICODE_SUPPORT:
-        # Replace common emoji with ASCII equivalents
-        replacements = {
-            '🎯': '[TARGET]',
-            '⏰': '[TIME]',
-            '🔔': '[BELL]',
-            '⏱️': '[TIMER]',
-            '💭': '[THOUGHT]',
-            '🌱': '[SEEDLING]',
-            '🎤': '[MIC]',
-            '💪': '[STRONG]',
-            '🔥': '[FIRE]',
-            '⭐': '[STAR]',
-            '🕐': '[CLOCK]',
-            '📅': '[CALENDAR]',
-            '📊': '[CHART]',
-            '✅': '[CHECK]',
-            '🏆': '[TROPHY]',
-            '❌': '[X]',
-            '⚠️': '[WARNING]',
-            '🚨': '[ALERT]',
-            '↑': '^',
-            '↓': 'v'
-        }
-        for emoji, replacement in replacements.items():
-            text = text.replace(emoji, replacement)
-    print(text)
+# Emoji handling moved to utils.emoji_handler - use that instead
 
 # Cross-platform keyboard handling
 try:
@@ -72,7 +43,7 @@ try:
             else:
                 try:
                     return key.decode('utf-8').lower()
-                except:
+                except UnicodeDecodeError:
                     return None
     else:  # Unix/Linux/Mac
         import tty, termios
@@ -209,8 +180,9 @@ class TerminalUI:
             total_session_seconds = int(elapsed.total_seconds())
             active_training_seconds = max(0, total_session_seconds - int(noise_pause_time))
             
-            time_ratio = (stats['time_in_range'] / stats['total_time']) * 100.0
-            goal_ratio = (stats.get('goal_achievements', 0) / stats['total_time']) * 100.0
+            total_time = stats['total_time']
+            time_ratio = (stats['time_in_range'] / total_time) * 100.0 if total_time > 0 else 0.0
+            goal_ratio = (stats.get('goal_achievements', 0) / total_time) * 100.0 if total_time > 0 else 0.0
             
             # Format durations nicely
             def format_duration(seconds):
@@ -699,8 +671,8 @@ class MenuSystem:
         
         return self._get_navigation_input(['1', '2', '3', '4', '5', '6', 'save', 'clear', '0'])
         
-    def show_advanced_settings_menu(self):
-        """Show advanced settings menu"""
+    def show_technical_settings_menu(self):
+        """Show technical settings menu"""
         self.ui.print_header()
         
         options = {
@@ -713,7 +685,7 @@ class MenuSystem:
             '0': 'Back to Settings Menu'
         }
         
-        self.ui.print_menu("Advanced Settings", options, "Fine-tune audio processing and alerts")
+        self.ui.print_menu("Technical Settings", options, "Fine-tune audio processing and alerts")
         
         return self._get_navigation_input(['n', 'a', 'd', 'h', 'u', 'reset', '0'])
         
