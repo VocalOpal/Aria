@@ -1,4 +1,4 @@
-# Aria Voice Studio v4.0
+# Aria Voice Studio v4.1
 
 **Your voice, your journey, your authentic self**
 
