@@ -1,8 +1,3 @@
-"""
-Audio Coordinator - Manages audio file analysis features
-Extracted from voice_trainer.py lines 1260-1453 (audio analysis functionality)
-"""
-
 import os
 import json
 from typing import Dict, Any, Optional, List
