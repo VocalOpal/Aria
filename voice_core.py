@@ -417,7 +417,7 @@ class AlertSystem:
         self.sound_enabled = False
         self.last_low_alert_time = 0
         self.last_high_alert_time = 0
-        self.alert_cooldown = 4.0  # Increased cooldown to reduce frequent beeps
+        self.alert_cooldown = 4.0 
         self.high_pitch_threshold = 400  # Hz - above this triggers gentle high beep for head voice awareness
         
         try:
@@ -495,8 +495,6 @@ class AlertSystem:
                 sound.play()
         except Exception as e:
             print(f"Error playing high alert: {e}")
-            
-    # Removed unused backward compatibility methods
             
     def cleanup(self):
         """Cleanup pygame mixer"""
