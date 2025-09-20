@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Aria Voice Studio v4.0
+Aria Voice Studio v4.1
 Voice training application
 
 Your voice, your journey, your authentic self
@@ -24,7 +24,7 @@ def print_banner():
     """Print application banner"""
     banner = """
 ================================================================================
-                            Aria Voice Studio v4.0
+                            Aria Voice Studio v4.1
                     Your voice, your journey, your authentic self
 ================================================================================
 Voice training that adapts to your progress:
