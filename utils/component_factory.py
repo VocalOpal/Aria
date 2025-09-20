@@ -2,8 +2,9 @@
 Component factory for managing voice training components with dependency injection
 """
 
-from typing import Any, Dict, Optional, Callable, Type
+from typing import Any, Dict, Optional, Callable, List
 from utils.lazy_loader import LazyLoader
+from utils.file_operations import get_logger
 
 
 class ComponentFactory:
@@ -14,7 +15,9 @@ class ComponentFactory:
         self._lazy_loader = LazyLoader()
         self._component_registry: Dict[str, Dict[str, Any]] = {}
         self._singletons: Dict[str, Any] = {}
-        
+        self._dependency_graph: Dict[str, List[str]] = {}
+        self.logger = get_logger()
+
         # Register core components
         self._register_core_components()
     
@@ -106,44 +109,85 @@ class ComponentFactory:
             'cleanup': cleanup,
             'dependencies': dependencies or []
         }
-    
+
+    def _validate_dependencies(self, component_name: str, dependencies: List[str]):
+        """Validate that all dependencies are registered and check for circular dependencies"""
+        for dep_name in dependencies:
+            if dep_name not in self._component_registry:
+                raise ValueError(f"Dependency '{dep_name}' for component '{component_name}' is not registered")
+
+        # Simple circular dependency check
+        self._check_circular_dependencies(component_name, dependencies, set())
+
+    def _check_circular_dependencies(self, component_name: str, dependencies: List[str], visited: set):
+        """Check for circular dependencies in the dependency graph"""
+        if component_name in visited:
+            raise ValueError(f"Circular dependency detected involving component '{component_name}'")
+
+        visited.add(component_name)
+        for dep_name in dependencies:
+            dep_config = self._component_registry.get(dep_name, {})
+            dep_dependencies = dep_config.get('dependencies', [])
+            self._check_circular_dependencies(dep_name, dep_dependencies, visited.copy())
+
     def get_component(self, name: str) -> Any:
-        """Get a component instance, creating it if necessary"""
+        """Get a component instance, creating it if necessary with proper error handling"""
         if name not in self._component_registry:
+            self.logger.error(f"Component '{name}' not registered")
             raise ValueError(f"Component '{name}' not registered")
-        
+
         config = self._component_registry[name]
-        
+
         # Check if singleton and already created
         if config['singleton'] and name in self._singletons:
             return self._singletons[name]
-        
-        # Create dependencies first
-        dependencies = {}
-        for dep_name in config['dependencies']:
-            dependencies[dep_name] = self.get_component(dep_name)
-        
-        # Create component
-        component = config['factory']()
-        
-        # Store singleton
-        if config['singleton']:
-            self._singletons[name] = component
-        
-        return component
+
+        try:
+            # Validate dependencies before creation
+            self._validate_dependencies(name, config['dependencies'])
+
+            # Create dependencies first
+            dependencies = {}
+            for dep_name in config['dependencies']:
+                try:
+                    dependencies[dep_name] = self.get_component(dep_name)
+                except Exception as e:
+                    self.logger.error(f"Failed to create dependency '{dep_name}' for '{name}': {e}")
+                    raise
+
+            # Create component
+            self.logger.debug(f"Creating component '{name}'")
+            component = config['factory']()
+
+            if component is None:
+                self.logger.error(f"Factory for '{name}' returned None")
+                raise RuntimeError(f"Failed to create component '{name}'")
+
+            # Store singleton
+            if config['singleton']:
+                self._singletons[name] = component
+
+            self.logger.info(f"Successfully created component '{name}'")
+            return component
+
+        except Exception as e:
+            self.logger.error(f"Error creating component '{name}': {e}")
+            raise RuntimeError(f"Failed to create component '{name}': {e}") from e
     
     def cleanup_component(self, name: str):
         """Cleanup a specific component"""
         if name in self._singletons:
             component = self._singletons[name]
             config = self._component_registry.get(name, {})
-            
+
             if config.get('cleanup'):
                 try:
                     config['cleanup'](component)
-                except Exception:
-                    pass  # Ignore cleanup errors
-            
+                    self.logger.debug(f"Successfully cleaned up component '{name}'")
+                except Exception as e:
+                    # Log but don't raise - we still want to remove from singletons
+                    self.logger.warning(f"Cleanup failed for component '{name}': {e}")
+
             del self._singletons[name]
     
     def cleanup_all(self):

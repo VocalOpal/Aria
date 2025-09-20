@@ -3,7 +3,6 @@ Lazy loading utilities to replace repetitive property patterns
 """
 
 import functools
-import weakref
 from typing import Any, Callable, Dict, Optional
 
 
@@ -90,9 +89,7 @@ def get_global_lazy_loader() -> LazyLoader:
     return _global_lazy_loader
 
 
-def lazy_init(name: str, factory: Callable[[], Any]) -> Any:
-    """Helper function for lazy initialization"""
-    return _global_lazy_loader.get_or_create(name, factory)
+# Removed unused lazy_init function - use get_or_create directly on LazyLoader instance
 
 
 def cleanup_lazy_components():
