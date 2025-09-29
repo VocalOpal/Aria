@@ -233,8 +233,6 @@ class VoiceSessionManager:
         
         # Require at least 1 minute (60 seconds) of voice data for session to be saved
         if voice_data_seconds < 60:
-            print(f"\nSession too short to save (need 1+ minutes of voice data, got {voice_data_seconds:.0f}s)")
-            print("Try training longer to build meaningful progress data!")
             return False
             
         try:
@@ -264,7 +262,6 @@ class VoiceSessionManager:
             return True
             
         except Exception as e:
-            print(f"Error saving session data: {e}")
             return False
     
     def load_progress_data(self):
@@ -275,7 +272,6 @@ class VoiceSessionManager:
                     data = json.load(f)
                     self.weekly_sessions = data.get('weekly_sessions', [])
             except Exception as e:
-                print(f"Error loading progress data: {e}")
                 self.weekly_sessions = []
         else:
             self.weekly_sessions = []
@@ -294,7 +290,6 @@ class VoiceSessionManager:
                 json.dump(data, f, indent=2)
             return True
         except Exception as e:
-            print(f"Error saving progress data: {e}")
             return False
     
     def get_progress_trends(self):

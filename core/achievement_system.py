@@ -1,6 +1,7 @@
 
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
+from utils.emoji_handler import convert_emoji_text, get_status_indicator
 
 
 class VoiceAchievementSystem:
@@ -8,11 +9,11 @@ class VoiceAchievementSystem:
     
     def __init__(self):
         self.rarity_icons = {
-            'common': '🥉',
-            'uncommon': '🥈', 
-            'rare': '🥇',
-            'epic': '💜',
-            'legendary': '💎'
+            'common': convert_emoji_text('🥉', 'achievement'),
+            'uncommon': convert_emoji_text('🥈', 'achievement'),
+            'rare': convert_emoji_text('🥇', 'achievement'),
+            'epic': convert_emoji_text('💜', 'achievement'),
+            'legendary': convert_emoji_text('💎', 'achievement')
         }
     
     def calculate_streaks(self, sessions: List[Dict]) -> Dict[str, Any]:
@@ -149,14 +150,14 @@ class VoiceAchievementSystem:
         
         # Session count achievements
         session_milestones = [
-            (1, "🎤 First Steps", "Completed your first training session", "common"),
-            (3, "🌱 Getting Started", "Completed 3 training sessions", "common"), 
-            (5, "💪 Building Habits", "Completed 5 training sessions", "common"),
-            (10, "🔥 Building Momentum", "Completed 10 training sessions", "uncommon"),
-            (20, "🎯 Dedicated Learner", "Completed 20 training sessions", "uncommon"),
-            (50, "⭐ Voice Warrior", "Completed 50 training sessions", "rare"),
-            (100, "🏆 Voice Master", "Completed 100 training sessions", "epic"),
-            (200, "💎 Voice Legend", "Completed 200 training sessions", "legendary")
+            (1, convert_emoji_text("🎤 First Steps", "achievement"), "Completed your first training session", "common"),
+            (3, convert_emoji_text("🌱 Getting Started", "achievement"), "Completed 3 training sessions", "common"),
+            (5, convert_emoji_text("💪 Building Habits", "achievement"), "Completed 5 training sessions", "common"),
+            (10, convert_emoji_text("🔥 Building Momentum", "achievement"), "Completed 10 training sessions", "uncommon"),
+            (20, convert_emoji_text("🎯 Dedicated Learner", "achievement"), "Completed 20 training sessions", "uncommon"),
+            (50, convert_emoji_text("⭐ Voice Warrior", "achievement"), "Completed 50 training sessions", "rare"),
+            (100, convert_emoji_text("🏆 Voice Master", "achievement"), "Completed 100 training sessions", "epic"),
+            (200, convert_emoji_text("💎 Voice Legend", "achievement"), "Completed 200 training sessions", "legendary")
         ]
         
         for count, name, desc, rarity in session_milestones:
@@ -170,11 +171,11 @@ class VoiceAchievementSystem:
         
         # Time-based achievements
         time_milestones = [
-            (30, "⏰ Dedicated Trainer", "Practiced for 30+ minutes total", "common"),
-            (120, "🕐 Marathon Trainer", "Practiced for 2+ hours total", "uncommon"),
-            (300, "⏳ Time Master", "Practiced for 5+ hours total", "rare"),
-            (600, "⏰ Training Veteran", "Practiced for 10+ hours total", "epic"),
-            (1200, "🏅 Time Champion", "Practiced for 20+ hours total", "legendary")
+            (30, convert_emoji_text("⏰ Dedicated Trainer", "time"), "Practiced for 30+ minutes total", "common"),
+            (120, convert_emoji_text("🕐 Marathon Trainer", "time"), "Practiced for 2+ hours total", "uncommon"),
+            (300, convert_emoji_text("⏳ Time Master", "time"), "Practiced for 5+ hours total", "rare"),
+            (600, convert_emoji_text("⏰ Training Veteran", "time"), "Practiced for 10+ hours total", "epic"),
+            (1200, convert_emoji_text("🏅 Time Champion", "achievement"), "Practiced for 20+ hours total", "legendary")
         ]
         
         for minutes, name, desc, rarity in time_milestones:
@@ -191,11 +192,11 @@ class VoiceAchievementSystem:
         best_streak = streak_info.get('best_streak', 0)
         
         streak_milestones = [
-            (3, "🔥 Streak Starter", "Maintained a 3-day training streak", "common"),
-            (7, "📅 Week Warrior", "Maintained a 7-day training streak", "uncommon"),
-            (14, "💪 Two Week Champion", "Maintained a 14-day training streak", "rare"),
-            (30, "🏆 Month Master", "Maintained a 30-day training streak", "epic"),
-            (100, "💎 Century Streaker", "Maintained a 100-day training streak", "legendary")
+            (3, convert_emoji_text("🔥 Streak Starter", "achievement"), "Maintained a 3-day training streak", "common"),
+            (7, convert_emoji_text("📅 Week Warrior", "time"), "Maintained a 7-day training streak", "uncommon"),
+            (14, convert_emoji_text("💪 Two Week Champion", "achievement"), "Maintained a 14-day training streak", "rare"),
+            (30, convert_emoji_text("🏆 Month Master", "achievement"), "Maintained a 30-day training streak", "epic"),
+            (100, convert_emoji_text("💎 Century Streaker", "achievement"), "Maintained a 100-day training streak", "legendary")
         ]
         
         for days, name, desc, rarity in streak_milestones:
@@ -214,10 +215,10 @@ class VoiceAchievementSystem:
             
             # Goal achievement time
             goal_milestones = [
-                (30, "🎯 Goal Getter", "Hit target pitch for 30+ seconds total", "common"),
-                (300, "🎪 Goal Master", "Hit target pitch for 5+ minutes total", "uncommon"),
-                (1800, "🏹 Sharpshooter", "Hit target pitch for 30+ minutes total", "rare"),
-                (3600, "🎯 Perfect Aim", "Hit target pitch for 1+ hour total", "epic")
+                (30, convert_emoji_text("🎯 Goal Getter", "achievement"), "Hit target pitch for 30+ seconds total", "common"),
+                (300, convert_emoji_text("🎪 Goal Master", "achievement"), "Hit target pitch for 5+ minutes total", "uncommon"),
+                (1800, convert_emoji_text("🏹 Sharpshooter", "achievement"), "Hit target pitch for 30+ minutes total", "rare"),
+                (3600, convert_emoji_text("🎯 Perfect Aim", "achievement"), "Hit target pitch for 1+ hour total", "epic")
             ]
             
             for seconds, name, desc, rarity in goal_milestones:
@@ -231,10 +232,10 @@ class VoiceAchievementSystem:
             
             # Improvement achievements
             improvement_milestones = [
-                (5, "📈 Voice Progress", "Improved average pitch by 5Hz", "common"),
-                (15, "🚀 Rising Star", "Improved average pitch by 15Hz", "uncommon"),
-                (30, "⬆️ Sky Climber", "Improved average pitch by 30Hz", "rare"),
-                (50, "🌟 Voice Transformer", "Improved average pitch by 50Hz", "epic")
+                (5, convert_emoji_text("📈 Voice Progress", "growth"), "Improved average pitch by 5Hz", "common"),
+                (15, convert_emoji_text("🚀 Rising Star", "growth"), "Improved average pitch by 15Hz", "uncommon"),
+                (30, convert_emoji_text("⬆️ Sky Climber", "growth"), "Improved average pitch by 30Hz", "rare"),
+                (50, convert_emoji_text("🌟 Voice Transformer", "growth"), "Improved average pitch by 50Hz", "epic")
             ]
             
             for hz, name, desc, rarity in improvement_milestones:
@@ -251,7 +252,7 @@ class VoiceAchievementSystem:
             recent_week = sessions[-7:]
             week_count = len(recent_week)
             achievements.append({
-                'name': "📅 Weekly Warrior", 
+                'name': convert_emoji_text("📅 Weekly Warrior", "time"), 
                 'description': "Completed 5+ sessions this week",
                 'rarity': 'uncommon',
                 'earned': week_count >= 5,
@@ -262,7 +263,7 @@ class VoiceAchievementSystem:
             recent_month = sessions[-30:]
             month_count = len(recent_month)
             achievements.append({
-                'name': "📆 Monthly Champion",
+                'name': convert_emoji_text("📆 Monthly Champion", "time"),
                 'description': "Completed 20+ sessions this month", 
                 'rarity': 'rare',
                 'earned': month_count >= 20,
@@ -290,123 +291,6 @@ class VoiceAchievementSystem:
         new_achievements = current_earned[previous_earned_count:]
         return new_achievements
     
-    def show_achievement_notification(self, achievement: Dict):
-        """Show a celebratory achievement notification"""
-        rarity_icon = self.rarity_icons.get(achievement['rarity'], '🏅')
-        
-        print("\n" + "=" * 60)
-        print("🎉 NEW ACHIEVEMENT UNLOCKED! 🎉")
-        print("=" * 60)
-        print(f"{rarity_icon} {achievement['name']}")
-        print(f"   {achievement['description']}")
-        print("=" * 60)
-        print("Great job! Keep up the amazing work!")
-        print()
-    
-    def show_milestone_celebration(self, milestones: List[Dict]):
-        """Show celebration for reaching multiple milestones"""
-        if not milestones:
-            return
-            
-        print("\n" + "🌟" * 20)
-        print("🎊 AMAZING PROGRESS! 🎊")
-        print("🌟" * 20)
-        
-        for achievement in milestones:
-            rarity_icon = self.rarity_icons.get(achievement['rarity'], '🏅')
-            print(f"✨ {rarity_icon} {achievement['name']}")
-            print(f"   {achievement['description']}")
-        
-        print("🌟" * 20)
-        print("You're doing fantastic! Your dedication is paying off!")
-        print()
-    
-    def display_achievements_summary(self, sessions: List[Dict]):
-        """Display achievements summary"""
-        if not sessions:
-            print("🌱 Start training to unlock achievements!")
-            self._show_upcoming_achievements()
-            return
-        
-        # Calculate overall statistics
-        total_sessions = len(sessions)
-        total_time = sum(s.get('duration_minutes', 0) for s in sessions)
-        
-        # Calculate streak information
-        streak_info = self.calculate_streaks(sessions)
-        
-        # Calculate pitch achievements
-        pitch_achievements = self.calculate_pitch_achievements(sessions)
-        
-        # Display current streak
-        current_streak = streak_info['current_streak']
-        best_streak = streak_info['best_streak']
-        
-        print(f"🔥 Current Streak: {current_streak} day{'s' if current_streak != 1 else ''}")
-        print(f"⭐ Best Streak: {best_streak} day{'s' if best_streak != 1 else ''}")
-        if current_streak >= 3:
-            print("   Keep it up! Consistency is key for voice training!")
-        print()
-        
-        # Get all achievements
-        achievements = self.get_all_achievements(total_sessions, total_time, streak_info, pitch_achievements, sessions)
-        
-        # Separate earned and upcoming achievements
-        earned = [a for a in achievements if a['earned']]
-        upcoming = [a for a in achievements if not a['earned']]
-        
-        # Display earned achievements
-        if earned:
-            print("🏅 Earned Achievements:")
-            for achievement in earned:
-                rarity_icon = self.rarity_icons.get(achievement['rarity'], '🏅')
-                print(f"✅ {rarity_icon} {achievement['name']} - {achievement['description']}")
-            print()
-        
-        # Show next achievements to unlock
-        if upcoming:
-            next_achievements = sorted(upcoming, key=lambda x: x.get('progress_percent', 0))[-3:]
-            print("🎯 Next Goals:")
-            for achievement in next_achievements:
-                progress = achievement.get('progress_percent', 0)
-                rarity_icon = self.rarity_icons.get(achievement['rarity'], '🏅')
-                progress_bar = self._create_progress_bar(progress, 10)
-                print(f"🔒 {rarity_icon} {achievement['name']} {progress_bar} {progress:.0f}%")
-                print(f"   {achievement['description']}")
-            print()
-        
-        # Summary statistics
-        print("📊 Training Statistics:")
-        print(f"   Total Sessions: {total_sessions}")
-        print(f"   Total Practice Time: {total_time:.1f} minutes ({total_time/60:.1f} hours)")
-        
-        if total_sessions > 0:
-            avg_session_time = total_time / total_sessions
-            print(f"   Average Session: {avg_session_time:.1f} minutes")
-            
-            # Weekly activity
-            recent_week_sessions = [s for s in sessions if self._is_within_days(s.get('date', ''), 7)]
-            print(f"   This Week: {len(recent_week_sessions)} sessions")
-        
-        print()
-    
-    def _show_upcoming_achievements(self):
-        """Show what achievements are available to unlock"""
-        print("\n🎯 Achievements waiting to be unlocked:")
-        print("   🎤 First Steps - Complete your first training session")
-        print("   💪 Getting Started - Complete 5 training sessions") 
-        print("   🔥 Streak Master - Maintain a 3-day training streak")
-        print("   🎯 Goal Getter - Hit your target pitch for 30 seconds")
-        print("   ⏰ Dedicated Trainer - Practice for 30+ minutes total")
-        print("   📈 Voice Progress - Improve average pitch by 10Hz")
-        print("   And many more!")
-        print()
-    
-    def _create_progress_bar(self, percentage: float, width: int = 10) -> str:
-        """Create a progress bar for achievements"""
-        filled = int((percentage / 100.0) * width)
-        bar = "█" * filled + "░" * (width - filled)
-        return f"[{bar}]"
     
     def _is_within_days(self, date_str: str, days: int) -> bool:
         """Check if date string is within specified days from today"""

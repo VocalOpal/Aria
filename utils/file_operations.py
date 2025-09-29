@@ -1,7 +1,3 @@
-"""
-Atomic file operations and enhanced logging utilities for Aria Voice Studio.
-Provides safe file I/O operations that prevent data corruption.
-"""
 
 import json
 import os
@@ -12,7 +8,6 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 from datetime import datetime
-
 
 class AtomicFileWriter:
     """Context manager for atomic file writing operations"""
@@ -26,10 +21,9 @@ class AtomicFileWriter:
 
     def __enter__(self):
         """Create temporary file for writing"""
-        # Ensure parent directory exists
+
         self.target_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Create temporary file in same directory as target
         temp_dir = self.target_path.parent
         self.temp_file = tempfile.NamedTemporaryFile(
             mode=self.mode,
@@ -47,15 +41,15 @@ class AtomicFileWriter:
             self.temp_file.close()
 
         if exc_type is None:
-            # Success - atomically replace target file
+
             try:
                 shutil.move(str(self.temp_path), str(self.target_path))
             except Exception as e:
-                # Clean up temp file if move fails
+
                 self._cleanup_temp()
                 raise e
         else:
-            # Exception occurred - clean up temp file
+
             self._cleanup_temp()
 
     def _cleanup_temp(self):
@@ -64,8 +58,7 @@ class AtomicFileWriter:
             try:
                 self.temp_path.unlink()
             except OSError:
-                pass  # Ignore cleanup errors
-
+                pass  
 
 def save_json_atomic(file_path: Union[str, Path], data: Dict[str, Any],
                     indent: int = 2, **kwargs) -> bool:
@@ -89,7 +82,6 @@ def save_json_atomic(file_path: Union[str, Path], data: Dict[str, Any],
         logging.error(f"Failed to save JSON to {file_path}: {e}")
         return False
 
-
 def load_json_safe(file_path: Union[str, Path],
                   default: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
@@ -112,7 +104,6 @@ def load_json_safe(file_path: Union[str, Path],
         logging.warning(f"Could not load JSON from {file_path}: {e}")
         return default
 
-
 def backup_file(file_path: Union[str, Path], max_backups: int = 5) -> bool:
     """
     Create a backup of the file with timestamp.
@@ -130,18 +121,15 @@ def backup_file(file_path: Union[str, Path], max_backups: int = 5) -> bool:
         return False
 
     try:
-        # Create backup filename with timestamp
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_name = f"{file_path.stem}_{timestamp}{file_path.suffix}"
         backup_path = file_path.parent / "backups" / backup_name
 
-        # Ensure backup directory exists
         backup_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Copy file to backup location
         shutil.copy2(file_path, backup_path)
 
-        # Clean up old backups
         _cleanup_old_backups(backup_path.parent, file_path.stem, max_backups)
 
         logging.info(f"Created backup: {backup_path}")
@@ -151,25 +139,21 @@ def backup_file(file_path: Union[str, Path], max_backups: int = 5) -> bool:
         logging.error(f"Failed to create backup of {file_path}: {e}")
         return False
 
-
 def _cleanup_old_backups(backup_dir: Path, file_stem: str, max_backups: int):
     """Remove old backup files, keeping only the most recent ones"""
     try:
-        # Find all backup files for this file
+
         backup_pattern = f"{file_stem}_*"
         backup_files = list(backup_dir.glob(backup_pattern))
 
-        # Sort by modification time (newest first)
         backup_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
 
-        # Remove excess backups
         for old_backup in backup_files[max_backups:]:
             old_backup.unlink()
             logging.debug(f"Removed old backup: {old_backup}")
 
     except Exception as e:
         logging.warning(f"Failed to cleanup old backups: {e}")
-
 
 class AriaLogger:
     """Enhanced logging setup for Aria Voice Studio"""
@@ -190,23 +174,19 @@ class AriaLogger:
         log_dir = Path(log_dir)
         log_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create logger
         logger = logging.getLogger('aria_voice_studio')
         logger.setLevel(getattr(logging, log_level.upper()))
 
-        # Clear any existing handlers
         logger.handlers.clear()
 
-        # Console handler
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.WARNING)  # Only show warnings/errors in console
+        console_handler.setLevel(logging.WARNING)  
         console_formatter = logging.Formatter(
             '%(levelname)s: %(message)s'
         )
         console_handler.setFormatter(console_formatter)
         logger.addHandler(console_handler)
 
-        # File handler (rotating by date)
         log_file = log_dir / f"aria_{datetime.now().strftime('%Y%m%d')}.log"
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(logging.DEBUG)
@@ -216,7 +196,6 @@ class AriaLogger:
         file_handler.setFormatter(file_formatter)
         logger.addHandler(file_handler)
 
-        # Error file handler (errors only)
         error_file = log_dir / f"aria_errors_{datetime.now().strftime('%Y%m%d')}.log"
         error_handler = logging.FileHandler(error_file)
         error_handler.setLevel(logging.ERROR)
@@ -237,7 +216,6 @@ class AriaLogger:
         logger.info(f"Python: {sys.version}")
         logger.info(f"Working Directory: {os.getcwd()}")
 
-        # Log audio system info if available
         try:
             import pyaudio
             pa = pyaudio.PyAudio()
@@ -247,8 +225,6 @@ class AriaLogger:
         except Exception as e:
             logger.warning(f"Could not get audio system info: {e}")
 
-
-# Global logger instance
 _logger = None
 
 def get_logger() -> logging.Logger:
@@ -258,21 +234,17 @@ def get_logger() -> logging.Logger:
         _logger = AriaLogger.setup_logging()
     return _logger
 
-
 def log_function_call(func_name: str, args: tuple = (), kwargs: dict = None):
     """Log function calls for debugging"""
     logger = get_logger()
     kwargs_str = f", kwargs={kwargs}" if kwargs else ""
     logger.debug(f"Called {func_name}(args={args}{kwargs_str})")
 
-
 def log_performance(operation: str, duration: float):
     """Log performance metrics"""
     logger = get_logger()
     logger.info(f"Performance: {operation} took {duration:.3f}s")
 
-
-# Context manager for performance logging
 class PerformanceTimer:
     """Context manager for timing operations"""
 
@@ -289,19 +261,14 @@ class PerformanceTimer:
             duration = time.time() - self.start_time
             log_performance(self.operation_name, duration)
 
-
-# Convenience functions
 def safe_save_config(config_data: Dict[str, Any], config_file: Union[str, Path]) -> bool:
     """Safely save configuration with backup and atomic operations"""
     config_file = Path(config_file)
 
-    # Create backup if file exists
     if config_file.exists():
         backup_file(config_file)
 
-    # Atomically save new config
     return save_json_atomic(config_file, config_data)
-
 
 def safe_load_config(config_file: Union[str, Path],
                     default_config: Dict[str, Any]) -> Dict[str, Any]:

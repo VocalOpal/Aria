@@ -10,6 +10,7 @@ import numpy as np
 from typing import Dict, Any, Optional
 from datetime import datetime
 from utils.file_operations import safe_save_config, safe_load_config, get_logger
+from utils.emoji_handler import convert_emoji_text, get_status_indicator
 
 
 class VoiceConfigurationManager:
@@ -33,6 +34,8 @@ class VoiceConfigurationManager:
             'max_recommended_duration': 45 * 60,
             'setup_completed': False,
             'onboarding_completed': False,
+            # Analysis mode settings
+            'analysis_mode': 'Balanced',  # Strict, Balanced, or Looser
             # Smoothed display settings
             'smooth_display_enabled': True,
             'display_range_size': 10,  # Hz range for smoothed display (e.g. 160-170 Hz)
@@ -58,7 +61,6 @@ class VoiceConfigurationManager:
             return True
         except Exception as e:
             self.logger.error(f"Error loading config: {e}")
-            print(f"Error loading config: {e}")
             return False
     
     def save_config(self) -> bool:
@@ -72,7 +74,6 @@ class VoiceConfigurationManager:
             return success
         except Exception as e:
             self.logger.error(f"Error saving config: {e}")
-            print(f"Error saving config: {e}")
             return False
     
     def get_config(self) -> Dict[str, Any]:
@@ -87,7 +88,7 @@ class VoiceConfigurationManager:
     def apply_preset(self, preset_name: str) -> bool:
         """Apply a voice preset to current configuration"""
         try:
-            from voice_presets import VoicePresets
+            from voice.presets import VoicePresets
             presets = VoicePresets()
             preset = presets.get_preset(preset_name)
             
@@ -104,7 +105,7 @@ class VoiceConfigurationManager:
             return self.save_config()
             
         except Exception as e:
-            print(f"Error applying preset: {e}")
+            self.logger.error(f"Error applying preset: {e}")
             return False
     
     def reset_to_defaults(self) -> bool:
@@ -171,8 +172,6 @@ class VoiceConfigurationManager:
     def _set_adaptive_starting_goal(self):
         """Set starting goal based on user's voice type and current capabilities"""
         self.config['current_goal'] = self.config['base_goal']
-        print(f"\n🌱 Starting your voice journey at {self.config['current_goal']} Hz")
-        print("The app will adapt to your progress - everyone's pace is different!")
     
     def _get_progressive_targets(self, current_avg: float) -> list:
         """Get progressive target milestones based on voice training type"""
@@ -224,91 +223,51 @@ class VoiceConfigurationManager:
             else:
                 return "30-45"  # Cap at 45 minutes
     
-    def adjust_threshold(self, current_value: float) -> float:
-        """Interactive threshold adjustment"""
-        print("[ Pitch Threshold Configuration ]")
-        print(f"Current threshold: {current_value} Hz")
-        print("\nTypical ranges:")
-        print("  Masculine voice: 85-180 Hz")
-        print("  Androgynous voice: 165-265 Hz") 
-        print("  Feminine voice: 165-265 Hz")
-        print()
-        
+    def set_threshold(self, new_value: float) -> bool:
+        """Set pitch threshold programmatically"""
         try:
-            new_value = input("Enter new threshold (Hz) or press Enter to cancel: ").strip()
-            if new_value:
-                value = float(new_value)
-                # threshold_hz is now unified with current_goal
-                self.config['current_goal'] = value
-                self.save_config()
-                return value
-        except ValueError:
-            print("Invalid input. Please enter a number.")
-        
-        return current_value
+            if 80 <= new_value <= 350:  # Validate range
+                self.config['current_goal'] = new_value
+                return self.save_config()
+            else:
+                self.logger.warning(f"Threshold {new_value} Hz is outside safe range (80-350 Hz)")
+                return False
+        except Exception as e:
+            self.logger.error(f"Error setting threshold: {e}")
+            return False
     
-    def adjust_sensitivity(self, current_value: float) -> float:
-        """Interactive sensitivity adjustment"""
-        print("[ Microphone Sensitivity Configuration ]")
-        print(f"Current sensitivity: {current_value}")
-        print("Range: 0.1 (very low) to 3.0 (very high)")
-        print("Normal range: 0.5 to 2.0")
-        print()
-        
+    def set_sensitivity(self, new_value: float) -> bool:
+        """Set microphone sensitivity programmatically"""
         try:
-            new_value = input("Enter new sensitivity: ").strip()
-            if new_value:
-                value = float(new_value)
-                value = max(0.1, min(3.0, value))
-                self.config['sensitivity'] = value
-                self.save_config()
-                return value
-        except ValueError:
-            print("Invalid input. Please enter a number.")
-        
-        return current_value
+            # Clamp to valid range
+            value = max(0.1, min(3.0, new_value))
+            self.config['sensitivity'] = value
+            return self.save_config()
+        except Exception as e:
+            self.logger.error(f"Error setting sensitivity: {e}")
+            return False
     
-    def adjust_dip_tolerance(self, current_value: float) -> float:
-        """Interactive dip tolerance adjustment"""
-        print("[ Dip Tolerance Configuration ]")
-        print(f"Current tolerance: {current_value} seconds")
-        print("Allows brief pitch drops without immediate alerts")
-        print("Recommended: 2-5 seconds for natural speech")
-        print()
-        
+    def set_dip_tolerance(self, new_value: float) -> bool:
+        """Set dip tolerance programmatically"""
         try:
-            new_value = input("Enter new tolerance (seconds): ").strip()
-            if new_value:
-                value = float(new_value)
-                value = max(0.5, min(10.0, value))
-                self.config['dip_tolerance_duration'] = value
-                self.save_config()
-                return value
-        except ValueError:
-            print("Invalid input. Please enter a number.")
-        
-        return current_value
+            # Clamp to valid range
+            value = max(0.5, min(10.0, new_value))
+            self.config['dip_tolerance_duration'] = value
+            return self.save_config()
+        except Exception as e:
+            self.logger.error(f"Error setting dip tolerance: {e}")
+            return False
     
-    def adjust_high_pitch_threshold(self, current_value: float) -> float:
-        """Interactive high pitch threshold adjustment"""
-        print("[ High Pitch Alert Threshold ]")
-        print(f"Current threshold: {current_value} Hz")
-        print("High pitch alert helps identify unrealistically high voice")
-        print("Recommended: 380-420 Hz (only for extremely high pitches)")
-        print()
-        
+    def set_high_pitch_threshold(self, new_value: float) -> bool:
+        """Set high pitch threshold programmatically"""
         try:
-            new_value = input("Enter new threshold (Hz): ").strip()
-            if new_value:
-                value = float(new_value)
-                value = max(300, min(500, value))
-                self.config['high_pitch_threshold'] = value
-                self.save_config()
-                return value
-        except ValueError:
-            print("Invalid input. Please enter a number.")
-        
-        return current_value
+            # Clamp to valid range
+            value = max(300, min(500, new_value))
+            self.config['high_pitch_threshold'] = value
+            return self.save_config()
+        except Exception as e:
+            self.logger.error(f"Error setting high pitch threshold: {e}")
+            return False
     
     def is_first_time_setup(self) -> bool:
         """Check if this is first-time setup"""
@@ -343,7 +302,7 @@ class VoiceConfigurationManager:
             
             return True
         except Exception as e:
-            print(f"Error clearing config data: {e}")
+            self.logger.error(f"Error clearing config data: {e}")
             return False
     
     def get_config_summary(self) -> Dict[str, Any]:

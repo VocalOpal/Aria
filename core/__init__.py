@@ -3,8 +3,9 @@ from .training_controller import VoiceTrainingController
 from .configuration_manager import VoiceConfigurationManager
 from .audio_coordinator import VoiceAudioAnalyzerCoordinator
 from .safety_coordinator import VoiceSafetyCoordinator
-from .menu_coordinator import VoiceMenuCoordinator
-from .error_handler import setup_global_error_handling, disable_global_error_handling, log_error
+# error_handler moved to utils/
+from utils.error_handler import setup_global_error_handling, disable_global_error_handling, log_error
+from .component_factory import ComponentFactory, get_component_factory, create_component, cleanup_all_components
 
 __all__ = [
     'VoiceSessionManager',
@@ -12,8 +13,11 @@ __all__ = [
     'VoiceConfigurationManager',
     'VoiceAudioAnalyzerCoordinator',
     'VoiceSafetyCoordinator',
-    'VoiceMenuCoordinator',
     'setup_global_error_handling',
     'disable_global_error_handling',
-    'log_error'
+    'log_error',
+    'ComponentFactory',
+    'get_component_factory',
+    'create_component',
+    'cleanup_all_components'
 ]

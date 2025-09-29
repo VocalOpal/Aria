@@ -7,6 +7,7 @@ import time
 import numpy as np
 from typing import Optional, Callable, Dict, Any
 from collections import deque
+from utils.file_operations import get_logger
 
 
 class VoiceTrainingController:
@@ -92,7 +93,7 @@ class VoiceTrainingController:
             return False
         
         # Import here to avoid circular imports
-        from voice_exercises import ExerciseSession
+        from gui.exercises import ExerciseSession
         
         # Create exercise session
         self.current_exercise = ExerciseSession(exercise_data)
@@ -191,7 +192,7 @@ class VoiceTrainingController:
             try:
                 self._process_audio_data(audio_data, config, ui_callback, session_type="live")
             except Exception as e:
-                print(f"Audio callback error: {e}")
+                get_logger().error(f"Audio callback error: {e}")
         
         return audio_callback
     
@@ -210,7 +211,7 @@ class VoiceTrainingController:
                 }
                 self._process_audio_data(audio_data, config, ui_callback, session_type="exercise")
             except Exception as e:
-                print(f"Exercise audio callback error: {e}")
+                get_logger().error(f"Exercise audio callback error: {e}")
         
         return audio_callback
     
