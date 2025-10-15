@@ -15,7 +15,6 @@
 - Share progress with community via Discord bot
 - Leaderboards, comparisons, and profile cards
 - Privacy controls for what you share
-- See `AriaDiscord/README.md` for bot setup
 
 ### 📊 Formant Tracking
 - Real-time F1/F2/F3 analysis using LPC algorithm
@@ -49,11 +48,6 @@
 - Faster startup with lazy component loading
 - Optimized buffer sizes for better latency
 
-### 🎨 Modern Design System
-- Borderless cards with soft shadows
-- Gradient-driven color scheme (cyan to pink)
-- Spacious layouts with 48px margins
-- Enhanced typography and spacing
 
 ## Installation
 
@@ -79,15 +73,7 @@ python main.py
 - ✅ Guided exercises library
 - ✅ Health monitoring system
 - ✅ Achievement tracking
-- ✅ Discord bot (optional)
 - ✅ Documentation
-
-## What's NOT Included
-
-- ❌ Test files (`tests/` directory)
-- ❌ Development tools (`run_tests.py`, `pytest.ini`)
-- ❌ User data (empty `data/` and `logs/` folders)
-- ❌ Old profiles or sessions
 
 ## Quick Start
 
@@ -117,14 +103,8 @@ python main.py
 
 ## License
 
-MIT License - See LICENSE file
+GNU General Public License - See LICENSE file
 
 ---
-
-**Previous Versions:**
-- v4: Multi-profile system, session templates, data migration
-- v3: Vocal health analyzer, weekly grading system
-- v2: Real-time training, pitch detection
-- v1: Initial release
 
 Thank you for using Aria Voice Studio! 🎤

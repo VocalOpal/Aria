@@ -47,10 +47,14 @@ class VoiceAnalyzer:
         self.formant_history = deque(maxlen=100)
         self.recent_energy = deque(maxlen=10)
 
+        # Speech mode detection (backend only - for context-aware grading)
+        self.speech_mode = 'unknown'
+        self.speech_mode_confidence = 0.0
+
         self.current_resonance = {"quality": "Unknown", "frequency": 0, "updated": 0}
 
-        # Faster pitch smoothing (150ms window ≈ 6 frames)
-        self.pitch_smoothing_window = deque(maxlen=6)
+        # Reduced pitch smoothing for more immediate response (user feedback)
+        self.pitch_smoothing_window = deque(maxlen=4)  # Reduced from 6 to 4 frames (~100ms)
         self.pitch_confidence_threshold = 0.45
 
         # Per-user resonance baseline tracking
@@ -176,8 +180,8 @@ class VoiceAnalyzer:
         cleaned_audio = cleaned_audio[:optimal_size]
 
         # Pre-emphasis and windowing
-        pre_emphasis = np.append(cleaned_audio[0], cleaned_audio[1:] - 0.95 * cleaned_audio[:-1])
-        windowed = pre_emphasis * np.hanning(len(pre_emphasis))
+        pre_emphasis = np.append(cleaned_audio[0], cleaned_audio[1:] - 0.97 * cleaned_audio[:-1])
+        windowed = pre_emphasis * np.hamming(len(pre_emphasis))
 
         # Faster autocorrelation using FFT
         fft_data = np.fft.rfft(windowed, n=len(windowed)*2)
@@ -226,16 +230,20 @@ class VoiceAnalyzer:
 
             if len(self.pitch_smoothing_window) >= 2:
                 # Simple exponential moving average for speed
-                alpha = 0.6
+                # Increased alpha from 0.6 to 0.75 for more immediate response (user feedback)
+                alpha = 0.75
                 smoothed_frequency = alpha * frequency + (1 - alpha) * self.pitch_smoothing_window[-2]
             else:
                 smoothed_frequency = frequency
 
             self.pitch_history.append(smoothed_frequency)
             self.get_realtime_resonance(cleaned_audio)
-            
+
             # Update formant analysis during pitch detection
             self._update_formants(cleaned_audio)
+
+            # Update speech mode detection (backend only)
+            self.detect_speech_mode()
 
             return smoothed_frequency
         else:
@@ -256,9 +264,9 @@ class VoiceAnalyzer:
         pre_emphasis = np.append(cleaned_audio[0], cleaned_audio[1:] - 0.97 * cleaned_audio[:-1])
         windowed = pre_emphasis * np.hamming(len(pre_emphasis))
 
-        correlation = np.correlate(windowed, windowed, mode='full')
-        mid_point = len(correlation) // 2
-        correlation = correlation[mid_point:]
+        # Use FFT-based autocorrelation for consistency and speed
+        fft_data = np.fft.rfft(windowed, n=len(windowed)*2)
+        correlation = np.fft.irfft(fft_data * np.conj(fft_data))[:len(windowed)]
 
         if correlation[0] > 0:
             correlation = correlation / correlation[0]
@@ -422,6 +430,32 @@ class VoiceAnalyzer:
                 alpha * centroid + (1 - alpha) * self.resonance_baseline["spectral_centroid"]
             )
             self.resonance_baseline["samples"] += 1
+
+    def detect_speech_mode(self):
+        """Detect if user is in sustained vowel or conversational mode (backend only)
+
+        Returns: 'sustained', 'conversational', 'unknown'
+        """
+        if len(self.pitch_history) < 20:
+            return 'unknown'
+
+        recent_pitches = list(self.pitch_history)[-40:]
+        pitch_range = max(recent_pitches) - min(recent_pitches)
+        pitch_std = np.std(recent_pitches)
+
+        # Sustained vowel: very stable pitch (< 15 Hz variation)
+        if pitch_range < 15 and pitch_std < 5:
+            self.speech_mode = 'sustained'
+            self.speech_mode_confidence = 0.9
+        # Conversational: more variation
+        elif pitch_range > 30 or pitch_std > 10:
+            self.speech_mode = 'conversational'
+            self.speech_mode_confidence = 0.8
+        else:
+            self.speech_mode = 'unknown'
+            self.speech_mode_confidence = 0.5
+
+        return self.speech_mode
 
     def _update_formants(self, audio_data):
         """Update formant analysis (called during pitch detection for efficiency)
@@ -676,7 +710,7 @@ class VoiceAnalyzer:
         These metrics indicate vocal strain and voice quality issues:
         - Jitter: pitch period variation (normal < 1%, strain > 2%)
         - Shimmer: amplitude variation (normal < 5%, strain > 10%)
-        - HNR: Harmonics-to-Noise Ratio in dB (good > 20dB, poor < 10dB)
+        - HNR: Harmonics-to-Noise Ratio in dB (good > 18dB, poor < 12dB)
 
         Returns: dict with jitter, shimmer, hnr, and strain_detected
         """
@@ -689,58 +723,115 @@ class VoiceAnalyzer:
             if expected_period < 20 or expected_period > len(audio_data) // 4:
                 return {"jitter": 0.0, "shimmer": 0.0, "hnr": 0.0, "strain_detected": False}
 
-            # === JITTER CALCULATION (pitch period variability) ===
-            # Find peaks in the waveform to measure period variations
-            peaks, _ = find_peaks(audio_data, distance=expected_period // 2, height=0.01)
+            # === JITTER CALCULATION ===
+            # Use adaptive threshold based on signal RMS and noise floor
+            signal_rms = float(np.sqrt(np.mean(audio_data ** 2)))
 
-            if len(peaks) >= 3:
+            # Adaptive threshold: higher for cleaner signals, with noise floor baseline
+            # Typical speech RMS: 0.01-0.1 (normalized float32)
+            if signal_rms > 0.05:  # Strong signal
+                peak_threshold = signal_rms * 0.65
+            elif signal_rms > 0.02:  # Moderate signal
+                peak_threshold = signal_rms * 0.55
+            else:  # Weak signal - be more selective
+                peak_threshold = max(signal_rms * 0.5, 0.015)
+
+            # Prominence requirement to reject noise bumps
+            prominence_threshold = peak_threshold * 0.7
+
+            # Find peaks with strict distance constraint
+            peaks, properties = find_peaks(
+                audio_data,
+                distance=int(expected_period * 0.85),  # Must be ~1 period apart
+                height=peak_threshold,
+                prominence=prominence_threshold
+            )
+
+            # Calculate jitter from period variation
+            if len(peaks) >= 5:
                 periods = np.diff(peaks)
-                mean_period = np.mean(periods)
-                period_variation = np.std(periods)
-                jitter_percent = (period_variation / mean_period * 100) if mean_period > 0 else 0.0
+
+                # Filter outliers: reject periods > ±30% of expected
+                valid_mask = np.abs(periods - expected_period) < (expected_period * 0.3)
+                valid_periods = periods[valid_mask]
+
+                if len(valid_periods) >= 3:
+                    mean_period = np.mean(valid_periods)
+                    std_period = np.std(valid_periods)
+                    jitter_percent = (std_period / mean_period * 100) if mean_period > 0 else 0.0
+                    # Clamp to physiological maximum
+                    jitter_percent = min(jitter_percent, 8.0)
+                else:
+                    jitter_percent = 0.0
             else:
                 jitter_percent = 0.0
 
-            # === SHIMMER CALCULATION (amplitude variability) ===
-            # Measure peak amplitude variations
-            if len(peaks) >= 3:
+            # === SHIMMER CALCULATION ===
+            if len(peaks) >= 5:
                 peak_amplitudes = np.abs(audio_data[peaks])
-                mean_amplitude = np.mean(peak_amplitudes)
-                amplitude_variation = np.std(peak_amplitudes)
-                shimmer_percent = (amplitude_variation / mean_amplitude * 100) if mean_amplitude > 0 else 0.0
+                median_amp = np.median(peak_amplitudes)
+
+                # Tight outlier rejection: ±60% of median
+                valid_mask = np.abs(peak_amplitudes - median_amp) < (median_amp * 0.6)
+                valid_amps = peak_amplitudes[valid_mask]
+
+                if len(valid_amps) >= 3:
+                    mean_amp = np.mean(valid_amps)
+                    std_amp = np.std(valid_amps)
+                    shimmer_percent = (std_amp / mean_amp * 100) if mean_amp > 0 else 0.0
+                    # Clamp to physiological maximum
+                    shimmer_percent = min(shimmer_percent, 15.0)
+                else:
+                    shimmer_percent = 0.0
             else:
                 shimmer_percent = 0.0
 
-            # === HNR CALCULATION (Harmonics-to-Noise Ratio) ===
-            # Use autocorrelation to separate harmonic from noise components
-            windowed = audio_data * np.hamming(len(audio_data))
-            correlation = np.correlate(windowed, windowed, mode='full')
-            mid_point = len(correlation) // 2
-            correlation = correlation[mid_point:]
+            # === HNR CALCULATION (CORRECTED) ===
+            # Use sufficient window for stable autocorrelation
+            window_size = min(len(audio_data), max(2048, expected_period * 6))
+            audio_segment = audio_data[:window_size]
 
-            # Normalize autocorrelation
-            if correlation[0] > 0:
-                correlation = correlation / correlation[0]
+            # Apply Hamming window
+            windowed = audio_segment * np.hamming(len(audio_segment))
 
-            # Get autocorrelation at expected period
-            if expected_period < len(correlation):
-                harmonic_power = correlation[expected_period]
-                noise_power = 1.0 - harmonic_power
+            # Compute autocorrelation (DO NOT NORMALIZE for HNR)
+            autocorr = np.correlate(windowed, windowed, mode='full')
+            mid_point = len(autocorr) // 2
+            autocorr = autocorr[mid_point:]  # Take positive lags only
 
-                # Prevent division by zero
-                if noise_power > 0.001:
-                    hnr_ratio = harmonic_power / noise_power
-                    hnr_db = 10 * np.log10(max(hnr_ratio, 1e-10))
+            # Extract power values
+            r0 = float(autocorr[0])  # Total signal power
+
+            # Find harmonic power at fundamental period (with tolerance)
+            if expected_period < len(autocorr):
+                # Check small range around expected period for peak
+                search_start = max(1, expected_period - 3)
+                search_end = min(len(autocorr), expected_period + 4)
+                rT = float(np.max(autocorr[search_start:search_end]))
+            else:
+                rT = 0.0
+
+            # Calculate HNR using clinical formula
+            if r0 > 0 and rT > 0:
+                noise_power = r0 - rT
+
+                # Prevent division by zero and negative noise
+                if noise_power > r0 * 0.001:  # Noise must be at least 0.1% of signal
+                    hnr_db = 10.0 * np.log10(rT / noise_power)
+                    # Clamp to realistic human range
+                    # Theoretical max ~40 dB (pure tone), typical speech 15-25 dB
+                    hnr_db = max(-5.0, min(35.0, hnr_db))
                 else:
-                    hnr_db = 30.0  # Very high quality
+                    # Nearly perfect periodicity (e.g., synthetic tone)
+                    hnr_db = 35.0
             else:
                 hnr_db = 0.0
 
             # === STRAIN DETECTION ===
-            # Thresholds based on clinical voice research
-            jitter_strain = jitter_percent > 2.0  # > 2% indicates strain
-            shimmer_strain = shimmer_percent > 10.0  # > 10% indicates strain
-            hnr_strain = hnr_db < 10.0  # < 10dB indicates poor quality
+            # Use realistic thresholds for live conditions (not lab conditions)
+            jitter_strain = jitter_percent > 1.5  # Clinical: > 1.0%, practical: > 1.5%
+            shimmer_strain = shimmer_percent > 7.0  # Clinical: > 5%, practical: > 7%
+            hnr_strain = hnr_db < 12.0  # Clinical: < 15 dB, practical: < 12 dB
 
             strain_detected = jitter_strain or shimmer_strain or hnr_strain
 
@@ -754,7 +845,9 @@ class VoiceAnalyzer:
                 "hnr_strain": hnr_strain
             }
 
-        except Exception:
+        except Exception as e:
+            from utils.error_handler import log_error
+            log_error(e, "VoiceAnalyzer.calculate_vocal_roughness")
             return {"jitter": 0.0, "shimmer": 0.0, "hnr": 0.0, "strain_detected": False}
 
     def calculate_roughness_lightweight(self, audio_data, pitch):
@@ -770,34 +863,58 @@ class VoiceAnalyzer:
             if expected_period < 20 or expected_period > len(audio_data) // 2:
                 return {"hnr": 0.0, "quality": "unknown"}
 
+            # Use smaller window for speed (1024 samples ≈ 23ms at 44.1kHz)
+            window_size = min(1024, len(audio_data))
+            audio_segment = audio_data[:window_size]
+
             # Quick HNR calculation
-            windowed = audio_data[:1024] * np.hamming(1024)
-            correlation = np.correlate(windowed, windowed, mode='same')
-            mid = len(correlation) // 2
+            windowed = audio_segment * np.hamming(window_size)
 
-            if correlation[mid] > 0:
-                correlation = correlation / correlation[mid]
+            # Autocorrelation via FFT (faster than np.correlate)
+            fft_data = np.fft.rfft(windowed, n=window_size*2)
+            autocorr = np.fft.irfft(fft_data * np.conj(fft_data))[:window_size]
 
-            if mid + expected_period < len(correlation):
-                harmonic = correlation[mid + expected_period]
-                noise = 1.0 - harmonic
-                hnr_db = 10 * np.log10(max(harmonic / max(noise, 0.001), 1e-10))
+            # DO NOT NORMALIZE - we need absolute power values
+            r0 = float(autocorr[0])
+
+            # Get harmonic power at expected period
+            if expected_period < len(autocorr):
+                # Small search window for speed
+                search_start = max(1, expected_period - 2)
+                search_end = min(len(autocorr), expected_period + 3)
+                rT = float(np.max(autocorr[search_start:search_end]))
+            else:
+                rT = 0.0
+
+            # Calculate HNR
+            if r0 > 0 and rT > 0:
+                noise_power = r0 - rT
+
+                if noise_power > r0 * 0.001:
+                    hnr_db = 10.0 * np.log10(rT / noise_power)
+                    hnr_db = max(-5.0, min(35.0, hnr_db))
+                else:
+                    hnr_db = 35.0
             else:
                 hnr_db = 0.0
 
-            # Classify quality
-            if hnr_db > 20:
+            # Classify quality with realistic thresholds for live conditions
+            if hnr_db > 18:
                 quality = "excellent"
-            elif hnr_db > 15:
+            elif hnr_db > 14:
                 quality = "good"
             elif hnr_db > 10:
                 quality = "fair"
-            else:
+            elif hnr_db > 0:
                 quality = "poor"
+            else:
+                quality = "unknown"
 
             return {"hnr": float(hnr_db), "quality": quality}
 
-        except Exception:
+        except Exception as e:
+            from utils.error_handler import log_error
+            log_error(e, "VoiceAnalyzer.calculate_roughness_lightweight")
             return {"hnr": 0.0, "quality": "unknown"}
 
 class AudioManager:

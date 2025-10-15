@@ -330,14 +330,15 @@ class VoiceTrainingController:
             self.resonance_quality = self.analyzer.calculate_resonance_quality(audio_data)
 
             # Update resonance stats if formant data is available
-            if formant_data and 'formants' in formant_data:
-                f1 = formant_data['formants'].get('F1', 0)
-                resonance_data = {
-                    'frequency': f1,
-                    'baseline': self.analyzer.resonance_baseline.get('f1', 500),
-                    'deviation': f1 - self.analyzer.resonance_baseline.get('f1', 500)
-                }
-                self.session_manager.update_resonance_stats(resonance_data)
+            if formant_data and 'f1' in formant_data:
+                f1 = formant_data.get('f1', 0)
+                if f1 > 0:
+                    resonance_data = {
+                        'frequency': f1,
+                        'baseline': self.analyzer.resonance_baseline.get('f1', 500),
+                        'deviation': f1 - self.analyzer.resonance_baseline.get('f1', 500)
+                    }
+                    self.session_manager.update_resonance_stats(resonance_data)
         
         # Voice quality analysis (less frequent - every 10th frame)
         if self._analysis_counter % 10 == 0:

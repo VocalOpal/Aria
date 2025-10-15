@@ -15,7 +15,6 @@ from ..design_system import (
     MetricRow, BodyLabel, CaptionLabel
 )
 from ..components.pitch_visualizer import ModernPitchVisualizer
-from ..components.safety_widget import SafetyWarningWidget, VoiceSafetyGUICoordinator
 from ..components.spectrogram_widget import CompactSpectrogramWidget
 from ..components import SessionSummaryDialog
 from ..utils.toast_notifications import ToastNotification
@@ -38,7 +37,7 @@ class TrainingScreen(QWidget):
         # Backend components
         self.audio_analyzer = None
         self.training_controller = None
-        self.safety_coordinator = None
+        self.safety_monitor = None
         self.snapshot_manager = VoiceSnapshotManager()
 
         # Pitch tracking
@@ -199,22 +198,52 @@ class TrainingScreen(QWidget):
         self.resonance_value = QLabel("Balanced")
         self.formant_value = QLabel("-- Hz")
 
-        # Safety Monitor Card
-        self.safety_card = InfoCard("Safety Monitor", min_height=210)
-        self.safety_card.content_layout.addStretch()
-        self.check_label = QLabel("\u2714")
+        # Safety Monitor Card with scroll area for long messages
+        self.safety_card = InfoCard("Safety Monitor", min_height=240)
+
+        # Icon at top
+        self.check_label = QLabel("✓")
         self.check_label.setStyleSheet(f"color: {AriaColors.GREEN}; font-size: 56px; background: transparent; font-weight: bold;")
         self.safety_card.content_layout.addWidget(self.check_label, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        # Scrollable message area
+        from PyQt6.QtWidgets import QScrollArea
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet(f"""
+            QScrollArea {{
+                border: none;
+                background: transparent;
+            }}
+            QScrollBar:vertical {{
+                background: {AriaColors.WHITE_15};
+                width: 8px;
+                border-radius: 4px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {AriaColors.WHITE_45};
+                border-radius: 4px;
+            }}
+        """)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setMaximumHeight(120)
+
+        # Message widget inside scroll area
+        scroll_content = QWidget()
+        scroll_content.setStyleSheet("background: transparent;")
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(0, 0, 0, 0)
+
         self.safety_msg = QLabel("No Strain Detected. Keep it up.")
-        self.safety_msg.setStyleSheet(f"color: white; font-size: {AriaTypography.BODY}px; font-weight: 500; background: transparent; margin-top: 6px;")
+        self.safety_msg.setStyleSheet(f"color: white; font-size: {AriaTypography.BODY}px; font-weight: 500; background: transparent;")
         self.safety_msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.safety_msg.setWordWrap(True)
-        self.safety_card.content_layout.addWidget(self.safety_msg)
-        self.safety_card.content_layout.addStretch()
+        scroll_layout.addWidget(self.safety_msg)
+        scroll_layout.addStretch()
 
-        # Safety warning widget (hidden by default)
-        self.safety_widget = SafetyWarningWidget()
-        self.safety_card.content_layout.addWidget(self.safety_widget)
+        scroll.setWidget(scroll_content)
+        self.safety_card.content_layout.addWidget(scroll)
 
         # Goal Progress Card
         self.goal_card = InfoCard("Your Goal", min_height=240)
@@ -469,12 +498,8 @@ class TrainingScreen(QWidget):
             self.training_controller = self.voice_trainer.training_controller
             self.audio_analyzer = self.voice_trainer.factory.get_component('voice_analyzer')
 
-            # Setup safety coordinator
-            safety_monitor = self.voice_trainer.factory.get_component('safety_monitor')
-            if safety_monitor:
-                self.safety_coordinator = VoiceSafetyGUICoordinator(safety_monitor)
-                self.safety_coordinator.register_safety_widget('training', self.safety_widget)
-                self.safety_widget.break_requested.connect(self.handle_break_request)
+            # Get safety monitor (we handle UI updates directly, no coordinator needed)
+            self.safety_monitor = self.voice_trainer.factory.get_component('safety_monitor')
 
             # Load target range from config
             config = self.voice_trainer.config_manager.get_config()
@@ -595,67 +620,91 @@ class TrainingScreen(QWidget):
                 if session_data:
                     dialog = SessionSummaryDialog(session_data, self, all_sessions=all_sessions)
                     dialog.exec()
-                
-                # Also show safety summary if configured
-                if self.safety_coordinator:
-                    self.safety_coordinator.show_safety_summary(session_duration, 'training')
         except Exception as e:
             log_error(e, "TrainingScreen.stop_training - showing session summary")
 
     def handle_audio_callback(self, callback_type, data):
-        """Handle callbacks from training controller"""
+        """Handle callbacks from training controller (called from audio thread)"""
+        # CRITICAL: Only GUI widget updates need main thread
+        # Data updates (pitch, buffers) can happen immediately - they're thread-safe
+
         if callback_type == 'noise_feedback':
-            # Show noise calibration message
-            message = data.get('message', '')
-            if '🤫' in message:
-                # Calibrating - show microphone icon
-                self.check_label.setText("🎤")
-                self.check_label.setStyleSheet(f"color: {AriaColors.TEAL}; font-size: 56px; background: transparent; font-weight: bold;")
-            else:
-                # Calibration complete - show checkmark
-                self.check_label.setText("✓")
-                self.check_label.setStyleSheet(f"color: {AriaColors.GREEN}; font-size: 56px; background: transparent; font-weight: bold;")
-            self.safety_msg.setText(message)
-            self.safety_msg.setStyleSheet(f"color: {AriaColors.WHITE_95}; font-size: {AriaTypography.BODY}px; font-weight: 500; background: transparent;")
-        
+            # GUI widget updates - defer to main thread
+            QTimer.singleShot(0, lambda: self._handle_noise_feedback(data))
+
         elif callback_type == 'training_status':
-            raw_pitch = data.get('pitch', 0)
-            if raw_pitch > 0:
-                self.current_pitch = self._smooth_pitch(raw_pitch)
-                if self.current_pitch > 0:
-                    self.pitch_readings.append(self.current_pitch)
-            
-            audio_chunk = data.get('audio_data')
-            if audio_chunk is not None:
-                import numpy as np
-                if isinstance(audio_chunk, np.ndarray):
-                    self.audio_buffer.extend(audio_chunk.tolist())
-                    # Update spectrogram if enabled
-                    if self.show_spectrogram and self.spectrogram_widget:
-                        self.spectrogram_widget.update_audio(audio_chunk)
-                elif isinstance(audio_chunk, list):
-                    self.audio_buffer.extend(audio_chunk)
-                    # Update spectrogram if enabled
-                    if self.show_spectrogram and self.spectrogram_widget:
-                        import numpy as np
-                        self.spectrogram_widget.update_audio(np.array(audio_chunk))
+            # Data updates - execute immediately for real-time pitch detection
+            self._handle_training_status_data(data)
 
         elif callback_type == 'safety_warning':
-            # Show safety warning
-            if self.safety_coordinator:
-                self.safety_coordinator.handle_safety_warning(data, 'training')
-            # Update safety card
-            self.check_label.setText("⚠")
-            self.check_label.setStyleSheet(f"color: {AriaColors.RED}; font-size: 56px; background: transparent; font-weight: bold;")
-            self.safety_msg.setText(data.get('message', 'Voice strain detected'))
-            self.safety_msg.setStyleSheet(f"color: {AriaColors.RED}; font-size: {AriaTypography.BODY}px; font-weight: 500; background: transparent;")
-            
-            # Auto-pause on critical strain
-            severity = data.get('severity', 'medium')
-            if severity == 'critical':
-                config = self.voice_trainer.config_manager.get_config()
-                if config.get('auto_pause_on_strain', True):
-                    self.auto_pause_for_strain(data)
+            # GUI widget updates - defer to main thread
+            QTimer.singleShot(0, lambda: self._handle_safety_warning(data))
+
+    def _handle_noise_feedback(self, data):
+        """Handle noise feedback on main GUI thread"""
+        message = data.get('message', '')
+        if '🤫' in message:
+            # Calibrating - show microphone icon
+            self.check_label.setText("🎤")
+            self.check_label.setStyleSheet(f"color: {AriaColors.TEAL}; font-size: 56px; background: transparent; font-weight: bold;")
+        else:
+            # Calibration complete - show checkmark
+            self.check_label.setText("✓")
+            self.check_label.setStyleSheet(f"color: {AriaColors.GREEN}; font-size: 56px; background: transparent; font-weight: bold;")
+        self.safety_msg.setText(message)
+        self.safety_msg.setStyleSheet(f"color: {AriaColors.WHITE_95}; font-size: {AriaTypography.BODY}px; font-weight: 500; background: transparent;")
+
+    def _handle_training_status_data(self, data):
+        """Handle training status data updates (called from audio thread - no GUI updates!)"""
+        # Update pitch data immediately - thread-safe data structures
+        raw_pitch = data.get('pitch', 0)
+        if raw_pitch > 0:
+            self.current_pitch = self._smooth_pitch(raw_pitch)
+            if self.current_pitch > 0:
+                self.pitch_readings.append(self.current_pitch)
+
+        # Update audio buffer immediately - thread-safe
+        audio_chunk = data.get('audio_data')
+        if audio_chunk is not None:
+            import numpy as np
+            if isinstance(audio_chunk, np.ndarray):
+                self.audio_buffer.extend(audio_chunk.tolist())
+                # Spectrogram is a Qt widget - defer its update to main thread
+                if self.show_spectrogram and self.spectrogram_widget:
+                    QTimer.singleShot(0, lambda: self.spectrogram_widget.update_audio(audio_chunk))
+            elif isinstance(audio_chunk, list):
+                self.audio_buffer.extend(audio_chunk)
+                # Spectrogram is a Qt widget - defer its update to main thread
+                if self.show_spectrogram and self.spectrogram_widget:
+                    chunk_array = np.array(audio_chunk)
+                    QTimer.singleShot(0, lambda: self.spectrogram_widget.update_audio(chunk_array))
+
+    def _handle_safety_warning(self, data):
+        """Handle safety warning on main GUI thread"""
+        # Update safety card with warning
+        self.check_label.setText("⚠")
+        self.check_label.setStyleSheet(f"color: {AriaColors.RED}; font-size: 56px; background: transparent; font-weight: bold;")
+
+        # Display warning message
+        message = data.get('message', 'Voice strain detected')
+        self.safety_msg.setText(message)
+
+        # Color based on severity
+        severity = data.get('severity', 'light')
+        if severity == 'critical':
+            color = AriaColors.RED
+        elif severity == 'strong':
+            color = AriaColors.RED_HOVER
+        else:
+            color = AriaColors.PINK
+
+        self.safety_msg.setStyleSheet(f"color: {color}; font-size: {AriaTypography.BODY}px; font-weight: 500; background: transparent;")
+
+        # Auto-pause on critical strain
+        if severity == 'critical':
+            config = self.voice_trainer.config_manager.get_config()
+            if config.get('auto_pause_on_strain', True):
+                self.auto_pause_for_strain(data)
 
     def _smooth_pitch(self, new_pitch):
         """Apply pitch smoothing"""
@@ -679,11 +728,6 @@ class TrainingScreen(QWidget):
                 self.smoothed_pitch = new_pitch
 
         return self.smoothed_pitch
-
-    def handle_break_request(self):
-        """Handle break request from safety widget"""
-        if self.training_active:
-            self.stop_training()
 
     def update_stats(self):
         """Update real-time display"""
@@ -842,12 +886,14 @@ class TrainingScreen(QWidget):
         except Exception as e:
             log_error(e, "TrainingScreen.cleanup - stopping timer")
 
-        # Clear safety warnings
+        # Reset safety display
         try:
-            if self.safety_coordinator:
-                self.safety_coordinator.clear_all_warnings()
+            self.check_label.setText("✓")
+            self.check_label.setStyleSheet(f"color: {AriaColors.GREEN}; font-size: 56px; background: transparent; font-weight: bold;")
+            self.safety_msg.setText("No Strain Detected. Keep it up.")
+            self.safety_msg.setStyleSheet(f"color: white; font-size: {AriaTypography.BODY}px; font-weight: 500; background: transparent;")
         except Exception as e:
-            log_error(e, "TrainingScreen.cleanup - clearing safety warnings")
+            log_error(e, "TrainingScreen.cleanup - resetting safety display")
 
     def record_snapshot(self):
         """Record a voice snapshot from the current session"""
@@ -939,11 +985,11 @@ class TrainingScreen(QWidget):
     def auto_pause_for_strain(self, warning_data):
         """Auto-pause training when critical strain is detected"""
         current_time = time.time()
-        
+
         # Check if we need to pause (not already paused and not recently warned)
         if not self.is_paused and (current_time - self.last_critical_warning_time) > 30:
             self.last_critical_warning_time = current_time
-            
+
             # Pause audio processing but keep UI active
             if self.training_controller:
                 try:
@@ -954,127 +1000,164 @@ class TrainingScreen(QWidget):
                 except Exception as e:
                     from utils.error_handler import log_error
                     log_error(e, "TrainingScreen.auto_pause_for_strain")
-            
-            # Show strain modal
-            self.show_strain_modal(warning_data)
+
+            # Show strain modal using QTimer to avoid blocking the audio callback thread
+            QTimer.singleShot(100, lambda: self.show_strain_modal(warning_data))
     
     def show_rest_modal(self, emergency=False):
         """Show rest modal dialog"""
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Rest Required" if emergency else "Take a Break")
-        dialog.setMinimumSize(400, 200)
-        dialog.setStyleSheet(f"""
-            QDialog {{
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:1,
-                    stop:0 {AriaColors.GRADIENT_BLUE_DARK},
-                    stop:1 {AriaColors.GRADIENT_PINK}
-                );
-            }}
-        """)
-        
-        layout = QVBoxLayout(dialog)
-        layout.setSpacing(AriaSpacing.LG)
-        layout.setContentsMargins(AriaSpacing.XXL, AriaSpacing.XXL, AriaSpacing.XXL, AriaSpacing.XXL)
-        
-        # Title
-        title = QLabel("🛑 Training Stopped" if emergency else "💆 Time to Rest")
-        title.setStyleSheet(f"color: white; font-size: {AriaTypography.TITLE}px; font-weight: bold; background: transparent;")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
-        
-        # Message
-        msg = QLabel("Emergency stop activated. Take a break and rest your voice." if emergency else 
-                    "Your voice needs rest. Stay hydrated and relax.")
-        msg.setStyleSheet(f"color: {AriaColors.WHITE_85}; font-size: {AriaTypography.BODY}px; background: transparent;")
-        msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        msg.setWordWrap(True)
-        layout.addWidget(msg)
-        
-        # OK button
-        ok_btn = PrimaryButton("OK")
-        ok_btn.clicked.connect(dialog.accept)
-        layout.addWidget(ok_btn, alignment=Qt.AlignmentFlag.AlignCenter)
-        
-        dialog.exec()
+        try:
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Rest Required" if emergency else "Take a Break")
+            dialog.setMinimumSize(500, 300)
+            dialog.setModal(True)
+
+            # Gradient background matching design system
+            dialog.setStyleSheet(f"""
+                QDialog {{
+                    background: qlineargradient(
+                        x1:0, y1:0, x2:1, y2:1,
+                        stop:0 {AriaColors.GRADIENT_BLUE_DARK},
+                        stop:1 {AriaColors.GRADIENT_PINK}
+                    );
+                }}
+                QLabel {{
+                    color: white;
+                    background: transparent;
+                }}
+            """)
+
+            layout = QVBoxLayout(dialog)
+            layout.setSpacing(AriaSpacing.XL)
+            layout.setContentsMargins(AriaSpacing.XXL, AriaSpacing.XXL, AriaSpacing.XXL, AriaSpacing.XXL)
+
+            # Title
+            title = QLabel("🛑 Training Stopped" if emergency else "💆 Time to Rest")
+            title.setStyleSheet(f"font-size: {AriaTypography.TITLE}px; font-weight: bold;")
+            title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(title)
+
+            # Message
+            msg = QLabel("Emergency stop activated. Take a break and rest your voice." if emergency else
+                        "Your voice needs rest. Stay hydrated and relax.")
+            msg.setStyleSheet(f"color: {AriaColors.WHITE_85}; font-size: {AriaTypography.BODY}px;")
+            msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            msg.setWordWrap(True)
+            layout.addWidget(msg)
+
+            layout.addStretch()
+
+            # OK button
+            ok_btn = PrimaryButton("OK, I'll Rest")
+            ok_btn.clicked.connect(dialog.accept)
+            ok_btn.setMinimumWidth(180)
+            layout.addWidget(ok_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+
+            # Process events to ensure dialog is fully painted (prevents white screen)
+            from PyQt6.QtWidgets import QApplication
+            QApplication.processEvents()
+
+            dialog.exec()
+        except Exception as e:
+            from utils.error_handler import log_error
+            log_error(e, "TrainingScreen.show_rest_modal")
     
     def show_strain_modal(self, warning_data):
         """Show vocal strain detection modal"""
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Vocal Strain Detected")
-        dialog.setMinimumSize(450, 250)
-        dialog.setStyleSheet(f"""
-            QDialog {{
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:1,
-                    stop:0 {AriaColors.GRADIENT_BLUE_DARK},
-                    stop:1 {AriaColors.GRADIENT_PINK}
-                );
-            }}
-        """)
-        
-        layout = QVBoxLayout(dialog)
-        layout.setSpacing(AriaSpacing.LG)
-        layout.setContentsMargins(AriaSpacing.XXL, AriaSpacing.XXL, AriaSpacing.XXL, AriaSpacing.XXL)
-        
-        # Title
-        title = QLabel("⚠️ Vocal Strain Detected - Training Paused")
-        title.setStyleSheet(f"color: {AriaColors.RED}; font-size: {AriaTypography.TITLE}px; font-weight: bold; background: transparent;")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
-        
-        # Message
-        msg = QLabel(warning_data.get('message', 'Critical vocal strain detected. Please rest your voice.'))
-        msg.setStyleSheet(f"color: {AriaColors.WHITE_85}; font-size: {AriaTypography.BODY}px; background: transparent;")
-        msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        msg.setWordWrap(True)
-        layout.addWidget(msg)
-        
-        # Buttons
-        button_layout = QHBoxLayout()
-        button_layout.setSpacing(AriaSpacing.LG)
-        
-        # Rest Now button (green)
-        rest_btn = QPushButton("Rest Now")
-        rest_btn.setMinimumSize(140, 45)
-        rest_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {AriaColors.GREEN};
-                color: white;
-                border: none;
-                border-radius: {AriaRadius.MD}px;
-                font-size: {AriaTypography.BODY}px;
-                font-weight: 600;
-            }}
-            QPushButton:hover {{
-                background-color: #45B84E;
-            }}
-        """)
-        rest_btn.clicked.connect(lambda: self.handle_strain_response(dialog, rest=True))
-        button_layout.addWidget(rest_btn)
-        
-        # Continue Carefully button (gray)
-        continue_btn = QPushButton("Continue Carefully")
-        continue_btn.setMinimumSize(140, 45)
-        continue_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {AriaColors.WHITE_35};
-                color: white;
-                border: 1px solid {AriaColors.WHITE_45};
-                border-radius: {AriaRadius.MD}px;
-                font-size: {AriaTypography.BODY}px;
-                font-weight: 600;
-            }}
-            QPushButton:hover {{
-                background-color: {AriaColors.WHITE_45};
-            }}
-        """)
-        continue_btn.clicked.connect(lambda: self.handle_strain_response(dialog, rest=False))
-        button_layout.addWidget(continue_btn)
-        
-        layout.addLayout(button_layout)
-        
-        dialog.exec()
+        try:
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Vocal Strain Detected")
+            dialog.setMinimumSize(550, 350)
+            dialog.setModal(True)
+
+            # Gradient background matching design system
+            dialog.setStyleSheet(f"""
+                QDialog {{
+                    background: qlineargradient(
+                        x1:0, y1:0, x2:1, y2:1,
+                        stop:0 {AriaColors.GRADIENT_BLUE_DARK},
+                        stop:1 {AriaColors.GRADIENT_PINK}
+                    );
+                }}
+                QLabel {{
+                    color: white;
+                    background: transparent;
+                }}
+            """)
+
+            layout = QVBoxLayout(dialog)
+            layout.setSpacing(AriaSpacing.XL)
+            layout.setContentsMargins(AriaSpacing.XXL, AriaSpacing.XXL, AriaSpacing.XXL, AriaSpacing.XXL)
+
+            # Warning icon
+            icon_label = QLabel("⚠️")
+            icon_label.setStyleSheet("font-size: 64px;")
+            icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(icon_label)
+
+            # Title
+            title = QLabel("Vocal Strain Detected")
+            title.setStyleSheet(f"color: {AriaColors.RED}; font-size: {AriaTypography.TITLE}px; font-weight: bold;")
+            title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(title)
+
+            # Subtitle
+            subtitle = QLabel("Training has been paused for your safety")
+            subtitle.setStyleSheet(f"color: {AriaColors.WHITE_70}; font-size: {AriaTypography.SUBHEADING}px;")
+            subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(subtitle)
+
+            # Message in card
+            msg_card = QFrame()
+            msg_card.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {AriaColors.CARD_BG};
+                    border-radius: {AriaRadius.LG}px;
+                    border: 1px solid {AriaColors.WHITE_25};
+                    padding: {AriaSpacing.LG}px;
+                }}
+            """)
+            msg_layout = QVBoxLayout(msg_card)
+
+            msg = QLabel(warning_data.get('message', 'Critical vocal strain detected. Please rest your voice.'))
+            msg.setStyleSheet(f"color: {AriaColors.WHITE_95}; font-size: {AriaTypography.BODY}px;")
+            msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            msg.setWordWrap(True)
+            msg_layout.addWidget(msg)
+
+            layout.addWidget(msg_card)
+
+            layout.addStretch()
+
+            # Action buttons
+            button_layout = QHBoxLayout()
+            button_layout.setSpacing(AriaSpacing.MD)
+
+            # Rest Now button (primary action)
+            rest_btn = PrimaryButton("Rest Now (Recommended)")
+            rest_btn.setMinimumSize(200, 50)
+            rest_btn.clicked.connect(lambda: self.handle_strain_response(dialog, rest=True))
+            button_layout.addWidget(rest_btn)
+
+            # Continue Carefully button (secondary)
+            continue_btn = SecondaryButton("Continue Carefully")
+            continue_btn.setMinimumSize(200, 50)
+            continue_btn.clicked.connect(lambda: self.handle_strain_response(dialog, rest=False))
+            button_layout.addWidget(continue_btn)
+
+            layout.addLayout(button_layout)
+
+            # Process events to ensure dialog is fully painted (prevents white screen)
+            from PyQt6.QtWidgets import QApplication
+            QApplication.processEvents()
+
+            dialog.exec()
+        except Exception as e:
+            from utils.error_handler import log_error
+            log_error(e, "TrainingScreen.show_strain_modal")
+            # Fallback: just stop training without showing dialog
+            self.is_paused = False
+            self.training_active = False
     
     def handle_strain_response(self, dialog, rest):
         """Handle user response to strain modal"""
