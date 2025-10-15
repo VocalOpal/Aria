@@ -9,13 +9,85 @@ from utils.error_handler import log_error
 
 class VocalHealthAnalyzer:
     """Analyzes vocal health metrics and generates personalized recommendations"""
-    
+
     def __init__(self):
         self.grading_criteria = {
             'jitter': {'threshold': 1.0, 'points': 25, 'lower_is_better': True},
             'shimmer': {'threshold': 5.0, 'points': 25, 'lower_is_better': True},
             'hnr': {'threshold': 18.0, 'points': 25, 'lower_is_better': False},
             'strain_events': {'threshold': 5, 'points': 25, 'lower_is_better': True}
+        }
+
+        # Plain-language metric names for dashboard display
+        self.metric_display_names = {
+            'jitter': 'Voice Steadiness',
+            'shimmer': 'Voice Consistency',
+            'hnr': 'Voice Clarity',
+            'strain_events': 'Strain Alerts'
+        }
+
+        # Contextual explanations for dashboard tooltips
+        self.metric_explanations = {
+            'jitter': {
+                'simple': 'How consistent your voice pitch is from moment to moment',
+                'technical': 'Jitter measures cycle-to-cycle pitch variation. <1% is excellent, >2% may indicate vocal strain.',
+                'target': 'Target: <1.0% (excellent), <1.5% (good), <2.5% (fair)'
+            },
+            'shimmer': {
+                'simple': 'How consistent your voice volume is',
+                'technical': 'Shimmer measures cycle-to-cycle amplitude variation. <5% is excellent, >10% may indicate strain.',
+                'target': 'Target: <5.0% (excellent), <7.0% (good), <10.0% (fair)'
+            },
+            'hnr': {
+                'simple': 'How clear and noise-free your voice sounds',
+                'technical': 'HNR (Harmonics-to-Noise Ratio) measures voice clarity. >18dB is excellent, <12dB may indicate strain.',
+                'target': 'Target: >18 dB (excellent), >15 dB (good), >12 dB (fair)'
+            },
+            'strain_events': {
+                'simple': 'Number of times strain was detected during training',
+                'technical': 'Strain events occur when jitter, shimmer, or HNR exceed safe thresholds.',
+                'target': 'Target: <5 events (excellent), <10 (good), <20 (fair)'
+            }
+        }
+
+        # Grade meanings for dashboard display
+        self.grade_meanings = {
+            'A+': {
+                'title': 'Outstanding',
+                'description': 'Professional-level vocal health. Your voice is in excellent condition.',
+                'practical': 'Continue your current practice. You can safely train 5-6 days per week.',
+                'emoji': '⭐'
+            },
+            'A': {
+                'title': 'Excellent',
+                'description': 'Very healthy voice with minimal strain indicators.',
+                'practical': 'Great work! Maintain 4-5 practice days per week with rest days.',
+                'emoji': '✨'
+            },
+            'B': {
+                'title': 'Good',
+                'description': 'Healthy voice with room for improvement.',
+                'practical': 'Good progress. Focus on the metrics marked "fair" below. Take 2-3 rest days per week.',
+                'emoji': '✓'
+            },
+            'C': {
+                'title': 'Fair',
+                'description': 'Some strain indicators detected. Extra care recommended.',
+                'practical': 'Your voice needs attention. Reduce practice intensity and increase rest days. See recommendations below.',
+                'emoji': '⚠️'
+            },
+            'D': {
+                'title': 'Needs Attention',
+                'description': 'Multiple strain indicators detected.',
+                'practical': 'Take a break. Consider consulting a voice specialist if issues persist after 3-5 days of rest.',
+                'emoji': '🛑'
+            },
+            'F': {
+                'title': 'Critical',
+                'description': 'Significant vocal strain detected.',
+                'practical': 'Stop training immediately. Rest for at least 5-7 days and consult a voice specialist.',
+                'emoji': '🚨'
+            }
         }
     
     def calculate_health_grade(self, weekly_sessions: List[Dict]) -> Dict[str, any]:
@@ -42,7 +114,7 @@ class VocalHealthAnalyzer:
             score = 0
             details = {}
         
-            # Jitter score
+            # Jitter score (using practical thresholds for live conditions)
             avg_jitter = metrics.get('avg_jitter', 999)
             if avg_jitter < 1.0:
                 score += 25
@@ -50,7 +122,7 @@ class VocalHealthAnalyzer:
             elif avg_jitter < 1.5:
                 score += 15
                 details['jitter'] = {'value': avg_jitter, 'status': 'good', 'points': 15}
-            elif avg_jitter < 2.0:
+            elif avg_jitter < 2.5:
                 score += 10
                 details['jitter'] = {'value': avg_jitter, 'status': 'fair', 'points': 10}
             else:
@@ -130,6 +202,82 @@ class VocalHealthAnalyzer:
             return 'D'
         else:
             return 'F'
+
+    def get_dashboard_display_data(self, grade_data: Dict, user_session_count: int = 0) -> Dict:
+        """Get formatted data for dashboard display with plain language and context
+
+        Args:
+            grade_data: Output from calculate_health_grade
+            user_session_count: Total number of sessions user has completed
+
+        Returns:
+            Dict with display-ready formatting, tooltips, and contextual messaging
+        """
+        grade = grade_data.get('grade', 'N/A')
+        score = grade_data.get('score', 0)
+        details = grade_data.get('details', {})
+
+        # Get grade meaning
+        grade_info = self.grade_meanings.get(grade, {
+            'title': 'Unknown',
+            'description': 'Unable to calculate health grade',
+            'practical': 'Complete more training sessions to see your health grade.',
+            'emoji': '❓'
+        })
+
+        # Format metrics with plain language
+        metrics_display = {}
+        for metric_key in ['jitter', 'shimmer', 'hnr', 'strain_events']:
+            if metric_key in details:
+                metric_data = details[metric_key]
+                display_name = self.metric_display_names.get(metric_key, metric_key)
+                explanation = self.metric_explanations.get(metric_key, {})
+
+                metrics_display[metric_key] = {
+                    'display_name': display_name,
+                    'value': metric_data.get('value', 0),
+                    'status': metric_data.get('status', 'unknown'),
+                    'points': metric_data.get('points', 0),
+                    'simple_explanation': explanation.get('simple', ''),
+                    'technical_explanation': explanation.get('technical', ''),
+                    'target_range': explanation.get('target', ''),
+                    'emoji': self._get_status_emoji(metric_data.get('status', 'unknown'))
+                }
+
+        # Contextual messaging based on user experience
+        if user_session_count < 5:
+            context_message = "📚 You're just getting started! These metrics will become more consistent as you practice."
+            action_message = "Focus on learning the exercises and building good habits."
+        elif user_session_count < 20:
+            context_message = grade_info['practical']
+            action_message = "Check individual metrics below to see where to focus."
+        else:
+            context_message = grade_info['practical']
+            action_message = "Review trends to see your progress over time."
+
+        return {
+            'grade': grade,
+            'grade_emoji': grade_info.get('emoji', ''),
+            'grade_title': grade_info.get('title', ''),
+            'grade_description': grade_info.get('description', ''),
+            'score': score,
+            'score_max': 100,
+            'metrics': metrics_display,
+            'context_message': context_message,
+            'action_message': action_message,
+            'user_experience_level': 'new' if user_session_count < 5 else 'developing' if user_session_count < 20 else 'experienced'
+        }
+
+    def _get_status_emoji(self, status: str) -> str:
+        """Get emoji for metric status"""
+        status_emojis = {
+            'excellent': '⭐',
+            'good': '✓',
+            'fair': '◐',
+            'poor': '⚠️',
+            'unknown': '?'
+        }
+        return status_emojis.get(status, '?')
     
     def _calculate_average_metrics(self, sessions: List[Dict]) -> Dict[str, float]:
         """Calculate average metrics from sessions"""

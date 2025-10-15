@@ -606,11 +606,19 @@ class AriaMainWindow(QMainWindow):
 
     def eventFilter(self, obj, event):
         """Filter events to handle window state changes"""
-        if obj == self and event.type() == event.Type.WindowStateChange:
-            self.update_sidebar_text_visibility()
-        elif obj == self and event.type() == event.Type.Resize:
-            self.update_sidebar_text_visibility()
-        return super().eventFilter(obj, event)
+        try:
+            if obj == self and event.type() == event.Type.WindowStateChange:
+                self.update_sidebar_text_visibility()
+            elif obj == self and event.type() == event.Type.Resize:
+                self.update_sidebar_text_visibility()
+            return super().eventFilter(obj, event)
+        except (KeyboardInterrupt, SystemExit):
+            # Let keyboard interrupts pass through
+            raise
+        except Exception as e:
+            from utils.error_handler import log_error
+            log_error(e, "MainWindow.eventFilter")
+            return False
     
     def update_sidebar_text_visibility(self):
         """Show/hide sidebar text based on window state"""

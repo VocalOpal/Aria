@@ -397,7 +397,7 @@ class VoiceSessionManager:
         }
     
     def save_session_data(self):
-        """Save current session to progress tracking - requires minimum 1 minute of voice data"""
+        """Save current session to progress tracking - requires minimum 10 seconds of voice data"""
         try:
             if not self.current_session or self.session_stats['total_time'] == 0:
                 return False
@@ -407,14 +407,14 @@ class VoiceSessionManager:
             active_training_seconds = max(0, session_duration_seconds - self.total_noise_pause_time)
             voice_data_seconds = self.session_stats['total_time']  # This is actual voice processing time
 
-            # Require at least 1 minute (60 seconds) of voice data for session to be saved
-            if voice_data_seconds < 60:
+            # Require at least 10 seconds of voice data for session to be saved
+            if voice_data_seconds < 10:
                 return False
 
             session_data = {
                 'date': datetime.now().isoformat(),
                 'duration': (datetime.now() - self.session_stats['start_time']).total_seconds(),
-                'duration_minutes': voice_data_seconds / 60,
+                'duration_seconds': voice_data_seconds,  # Changed from duration_minutes to duration_seconds
                 'avg_pitch': self.session_stats['avg_pitch'],
                 'min_pitch': self.session_stats['min_pitch'],
                 'max_pitch': self.session_stats['max_pitch'],

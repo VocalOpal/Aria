@@ -32,9 +32,9 @@ class FormantAnalyzer:
         
         # Expected formant ranges (Hz) for validation
         self.formant_ranges = {
-            'F1': (200, 1000),
-            'F2': (600, 3500),
-            'F3': (1500, 4500)
+            'F1': (200, 900),    # Tightened from (200, 1000)
+            'F2': (800, 3500),   # Raised minimum from 600 to 800 Hz
+            'F3': (1900, 4500)   # Raised minimum from 1500 to 1900 Hz
         }
     
     def detect_formants(self, audio_data, sample_rate=None):
@@ -153,38 +153,52 @@ class FormantAnalyzer:
     
     def _extract_formants_from_lpc(self, lpc_coeffs, sample_rate):
         """Extract formant frequencies from LPC coefficients
-        
-        Formants correspond to the resonant frequencies, which are found
-        from the complex roots of the LPC polynomial.
+
+        Formants correspond to resonant frequencies, found from complex roots
+        of the LPC polynomial that lie inside the unit circle.
         """
         # Find roots of LPC polynomial
         roots = np.roots(lpc_coeffs)
-        
+
         # Keep only roots inside unit circle (stable poles)
         roots = roots[np.abs(roots) < 1.0]
-        
+
         # Convert to frequencies
-        # Angle gives us the frequency in radians
         angles = np.angle(roots)
-        
-        # Convert to Hz
         freqs = angles * (sample_rate / (2 * np.pi))
-        
+
         # Keep only positive frequencies
         freqs = freqs[freqs > 0]
-        
+
         # Sort by frequency
         freqs = np.sort(freqs)
-        
-        # Extract first 3 formants
-        if len(freqs) >= 3:
-            return {
-                'F1': float(freqs[0]),
-                'F2': float(freqs[1]),
-                'F3': float(freqs[2])
-            }
-        
-        return None
+
+        # Define realistic formant ranges for human voice
+        # Based on Peterson & Barney (1952), Hillenbrand et al. (1995)
+        # F1: vowel height (200-900 Hz for adults)
+        # F2: vowel backness (800-3500 Hz, MUST be > F1)
+        # F3: lip rounding (1900-4500 Hz, MUST be > F2)
+
+        # Extract candidates for each formant
+        f1_candidates = freqs[(freqs >= 200) & (freqs <= 900)]
+        f2_candidates = freqs[(freqs >= 800) & (freqs <= 3500)]
+        f3_candidates = freqs[(freqs >= 1900) & (freqs <= 4500)]
+
+        # Take the lowest frequency in each range (most likely the actual formant)
+        if len(f1_candidates) > 0 and len(f2_candidates) > 0 and len(f3_candidates) > 0:
+            F1 = float(f1_candidates[0])
+            F2 = float(f2_candidates[0])
+            F3 = float(f3_candidates[0])
+
+            # Final sanity check: formants must be ordered F1 < F2 < F3
+            if F1 < F2 < F3:
+                return {
+                    'F1': F1,
+                    'F2': F2,
+                    'F3': F3
+                }
+
+        return None  # Detection failed - don't return garbage values
     
     def _validate_formants(self, formants):
         """Validate formants are in expected physiological ranges

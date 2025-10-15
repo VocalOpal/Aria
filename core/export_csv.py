@@ -5,6 +5,31 @@ from datetime import datetime
 from typing import List, Dict, Any
 
 
+def format_duration(seconds: float) -> str:
+    """Format duration in seconds to human-readable string
+
+    Args:
+        seconds: Duration in seconds
+
+    Returns:
+        Formatted string like "1m 30s", "45s", or "2h 15m"
+    """
+    if seconds < 60:
+        return f"{int(seconds)}s"
+    elif seconds < 3600:
+        minutes = int(seconds // 60)
+        secs = int(seconds % 60)
+        if secs > 0:
+            return f"{minutes}m {secs}s"
+        return f"{minutes}m"
+    else:
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        if minutes > 0:
+            return f"{hours}h {minutes}m"
+        return f"{hours}h"
+
+
 def export_sessions_to_csv(sessions: List[Dict[str, Any]], filepath: str) -> bool:
     """Export session data to CSV file
     
@@ -21,7 +46,7 @@ def export_sessions_to_csv(sessions: List[Dict[str, Any]], filepath: str) -> boo
         
         csv_columns = [
             'date',
-            'duration_minutes',
+            'duration_seconds',
             'avg_pitch',
             'min_pitch',
             'max_pitch',
@@ -68,12 +93,18 @@ def _format_session_for_csv(session: Dict[str, Any]) -> Dict[str, Any]:
         date_str = date_obj.strftime('%Y-%m-%d %H:%M:%S')
     except:
         date_str = session.get('date', 'Unknown')
-    
-    duration_minutes = session.get('duration_minutes', session.get('duration', 0) / 60)
-    
+
+    # Support both new duration_seconds and legacy duration_minutes for backwards compatibility
+    if 'duration_seconds' in session:
+        duration_seconds = session['duration_seconds']
+    elif 'duration_minutes' in session:
+        duration_seconds = session['duration_minutes'] * 60  # Convert old minutes to seconds
+    else:
+        duration_seconds = session.get('duration', 0)
+
     return {
         'date': _escape_csv_value(date_str),
-        'duration_minutes': round(duration_minutes, 2),
+        'duration_seconds': round(duration_seconds, 1),
         'avg_pitch': round(session.get('avg_pitch', 0), 1),
         'min_pitch': round(session.get('min_pitch', 0), 1),
         'max_pitch': round(session.get('max_pitch', 0), 1),

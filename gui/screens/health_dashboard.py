@@ -24,8 +24,8 @@ class HealthDashboardScreen(QWidget):
         self.session_manager = voice_trainer.session_manager
         self.health_analyzer = VocalHealthAnalyzer()
         
-        # Current timeframe (week, month, year)
-        self.current_timeframe = 'week'
+        # Current timeframe (today, week, month, year)
+        self.current_timeframe = 'today'  # Default to 'today' for immediate feedback
 
         # Refresh timer
         self.refresh_timer = QTimer()
@@ -54,16 +54,19 @@ class HealthDashboardScreen(QWidget):
         # Timeframe selector
         timeframe_layout = QHBoxLayout()
         timeframe_layout.setSpacing(AriaSpacing.SM)
-        
+
         self.timeframe_buttons = QButtonGroup()
+        self.today_btn = self._create_timeframe_button("Today", "today")
         self.week_btn = self._create_timeframe_button("Week", "week")
         self.month_btn = self._create_timeframe_button("Month", "month")
         self.year_btn = self._create_timeframe_button("Year", "year")
-        
-        self.timeframe_buttons.addButton(self.week_btn, 0)
-        self.timeframe_buttons.addButton(self.month_btn, 1)
-        self.timeframe_buttons.addButton(self.year_btn, 2)
-        
+
+        self.timeframe_buttons.addButton(self.today_btn, 0)
+        self.timeframe_buttons.addButton(self.week_btn, 1)
+        self.timeframe_buttons.addButton(self.month_btn, 2)
+        self.timeframe_buttons.addButton(self.year_btn, 3)
+
+        timeframe_layout.addWidget(self.today_btn)
         timeframe_layout.addWidget(self.week_btn)
         timeframe_layout.addWidget(self.month_btn)
         timeframe_layout.addWidget(self.year_btn)
@@ -93,14 +96,14 @@ class HealthDashboardScreen(QWidget):
         comparison_row.addWidget(self.last_week_card)
         scroll_layout.addLayout(comparison_row)
 
-        # Trend Metrics Row
+        # Trend Metrics Row (using plain language names)
         metrics_row = QHBoxLayout()
         metrics_row.setSpacing(AriaSpacing.LG)
 
-        self.jitter_card = self._create_metric_card("Jitter", "0.0%")
-        self.shimmer_card = self._create_metric_card("Shimmer", "0.0%")
-        self.hnr_card = self._create_metric_card("HNR", "0.0")
-        self.strain_card = self._create_metric_card("Strain Events", "0")
+        self.jitter_card = self._create_metric_card("Voice Steadiness", "0.0%")
+        self.shimmer_card = self._create_metric_card("Voice Consistency", "0.0%")
+        self.hnr_card = self._create_metric_card("Voice Clarity", "0.0")
+        self.strain_card = self._create_metric_card("Strain Alerts", "0")
 
         metrics_row.addWidget(self.jitter_card)
         metrics_row.addWidget(self.shimmer_card)
@@ -142,7 +145,7 @@ class HealthDashboardScreen(QWidget):
         """Create a timeframe selector button"""
         btn = QPushButton(text)
         btn.setCheckable(True)
-        btn.setChecked(timeframe == 'week')  # Week is default
+        btn.setChecked(timeframe == 'today')  # Today is default
         btn.clicked.connect(lambda: self._on_timeframe_changed(timeframe))
         
         btn.setStyleSheet(f"""
@@ -210,8 +213,15 @@ class HealthDashboardScreen(QWidget):
 
     def _create_metric_card(self, title, value):
         """Create a small metric display card"""
-        card = InfoCard(title, min_height=140)
+        card = InfoCard("", min_height=140)  # Empty title, we'll set it manually
 
+        # Title label (stored for plain language updates)
+        title_label = HeadingLabel(title)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        card.content_layout.addWidget(title_label)
+        card.title_label = title_label
+
+        # Value label
         value_label = QLabel(value)
         value_label.setStyleSheet(f"""
             color: white;
@@ -257,7 +267,9 @@ class HealthDashboardScreen(QWidget):
                 return
 
             # Load data based on timeframe
-            if self.current_timeframe == 'week':
+            if self.current_timeframe == 'today':
+                self._load_today_data(all_sessions)
+            elif self.current_timeframe == 'week':
                 self._load_weekly_data(all_sessions)
             elif self.current_timeframe == 'month':
                 self._load_monthly_data(all_sessions)
@@ -273,28 +285,105 @@ class HealthDashboardScreen(QWidget):
             else:
                 self._show_error()
     
+    def _load_today_data(self, all_sessions):
+        """Load today's health data for immediate feedback"""
+        from datetime import datetime
+
+        # Filter sessions from today
+        today = datetime.now().date()
+        today_sessions = [
+            s for s in all_sessions
+            if datetime.fromisoformat(s['date']).date() == today
+        ]
+
+        if not today_sessions:
+            self._show_no_data_today()
+            return
+
+        # Calculate health grade from today's sessions
+        grade_data = self.health_analyzer.calculate_health_grade(today_sessions)
+
+        # Get user's total session count for contextual messaging
+        user_session_count = len(all_sessions)
+
+        # Get dashboard display data with plain language
+        display_data = self.health_analyzer.get_dashboard_display_data(
+            grade_data,
+            user_session_count
+        )
+
+        # Update grade display
+        self._update_grade_display_enhanced(display_data)
+
+        # Update comparison cards (Today vs Yesterday)
+        yesterday = today - timedelta(days=1)
+        yesterday_sessions = [
+            s for s in all_sessions
+            if datetime.fromisoformat(s['date']).date() == yesterday
+        ]
+
+        if yesterday_sessions:
+            yesterday_grade = self.health_analyzer.calculate_health_grade(yesterday_sessions)
+            self.this_week_card.set_value(grade_data.get('grade', 'N/A'))
+            self.this_week_card.set_description(
+                f"Today | {len(today_sessions)} session{'s' if len(today_sessions) != 1 else ''}\nScore: {grade_data.get('score', 0)}/100"
+            )
+            self.last_week_card.set_value(yesterday_grade.get('grade', 'N/A'))
+            self.last_week_card.set_description(
+                f"Yesterday | {len(yesterday_sessions)} session{'s' if len(yesterday_sessions) != 1 else ''}\nScore: {yesterday_grade.get('score', 0)}/100"
+            )
+        else:
+            self.this_week_card.set_value(grade_data.get('grade', 'N/A'))
+            self.this_week_card.set_description(
+                f"Today | {len(today_sessions)} session{'s' if len(today_sessions) != 1 else ''}\nScore: {grade_data.get('score', 0)}/100"
+            )
+            self.last_week_card.set_value("N/A")
+            self.last_week_card.set_description("Yesterday\nNo sessions")
+
+        # Update metric cards with plain language
+        self._update_metric_cards_enhanced(display_data)
+
+        # Generate recommendations
+        recommendations = self.health_analyzer.generate_recommendations(grade_data, {'trends': {}})
+        self._update_recommendations(recommendations)
+
+        # Update summary
+        self._update_summary_today(display_data, len(today_sessions))
+
+        # Update advanced metrics
+        self._update_advanced_metrics(all_sessions)
+
     def _load_weekly_data(self, all_sessions):
-        """Load weekly health data (default view)"""
+        """Load weekly health data"""
         # Get health trends
         trend_data = self.health_analyzer.get_health_trends(all_sessions)
-        
+
         if not trend_data:
             self._show_no_data()
             return
-            
+
         this_week = trend_data.get('this_week', {})
         last_week = trend_data.get('last_week', {})
         trends = trend_data.get('trends', {})
         session_counts = trend_data.get('session_counts', {'this_week': 0, 'last_week': 0})
 
-        # Update grade display
-        self._update_grade_display(this_week)
+        # Get user's total session count for contextual messaging
+        user_session_count = len(all_sessions)
+
+        # Get dashboard display data with plain language (NEW)
+        display_data = self.health_analyzer.get_dashboard_display_data(
+            this_week,
+            user_session_count
+        )
+
+        # Update grade display with enhanced method
+        self._update_grade_display_enhanced(display_data)
 
         # Update comparison cards
         self._update_comparison_cards(this_week, last_week, session_counts)
 
-        # Update metric cards
-        self._update_metric_cards(this_week, trends)
+        # Update metric cards with enhanced method
+        self._update_metric_cards_enhanced(display_data)
 
         # Update recommendations
         recommendations = self.health_analyzer.generate_recommendations(this_week, trend_data)
@@ -594,6 +683,45 @@ class HealthDashboardScreen(QWidget):
 
         self.summary_label.setText(summary_text)
 
+    def _show_no_data_today(self):
+        """Show no data state for today view"""
+        self.grade_label.setText("N/A")
+        self.score_label.setText("No sessions today")
+        self.status_label.setText("Start training to see today's vocal health metrics!")
+
+        self.this_week_card.set_value("N/A")
+        self.this_week_card.set_description("Today\nNo sessions yet")
+        self.last_week_card.set_value("N/A")
+        self.last_week_card.set_description("Yesterday\nNo sessions")
+
+        self.jitter_card.value_label.setText("--")
+        self.shimmer_card.value_label.setText("--")
+        self.hnr_card.value_label.setText("--")
+        self.strain_card.value_label.setText("--")
+
+        self.fatigue_card.value_label.setText("--")
+        self.rest_card.value_label.setText("--")
+        self.recovery_card.value_label.setText("--")
+
+        # Clear recommendations and show today's message
+        while self.recommendations_layout.count():
+            child = self.recommendations_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+        today_rec = BodyLabel("Complete your first session today to see real-time vocal health metrics.")
+        today_rec.setStyleSheet(f"""
+            color: {AriaColors.WHITE_95};
+            font-size: {AriaTypography.BODY}px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: {AriaSpacing.MD}px;
+            border-radius: {AriaRadius.SM}px;
+            border-left: 3px solid {AriaColors.TEAL};
+        """)
+        self.recommendations_layout.addWidget(today_rec)
+
+        self.summary_label.setText("Complete a training session to see today's vocal health analysis.")
+
     def _show_no_data(self):
         """Show no data state"""
         self.grade_label.setText("N/A")
@@ -638,6 +766,84 @@ class HealthDashboardScreen(QWidget):
         self.grade_label.setText("Error")
         self.score_label.setText("Unable to load health data")
         self.status_label.setText("Please try again later")
+
+    def _update_grade_display_enhanced(self, display_data: dict):
+        """Update grade display with enhanced contextual data"""
+        grade = display_data['grade']
+        grade_emoji = display_data['grade_emoji']
+        grade_title = display_data['grade_title']
+
+        # Display grade with emoji
+        self.grade_label.setText(f"{grade_emoji} {grade}")
+        self.score_label.setText(f"{display_data['score']}/{display_data['score_max']} points")
+        self.status_label.setText(f"{grade_title} | {display_data['context_message']}")
+
+        # Color-code the grade
+        color = self._get_grade_color(grade)
+        self.grade_label.setStyleSheet(f"""
+            color: {color};
+            font-size: 96px;
+            font-weight: 900;
+            background: transparent;
+            letter-spacing: -2px;
+        """)
+
+    def _update_metric_cards_enhanced(self, display_data: dict):
+        """Update metric cards with plain language from display_data"""
+        metrics = display_data.get('metrics', {})
+
+        # Update each metric card with plain language
+        for metric_key in ['jitter', 'shimmer', 'hnr', 'strain_events']:
+            if metric_key not in metrics:
+                continue
+
+            metric_data = metrics[metric_key]
+
+            # Format value
+            if metric_key == 'jitter' or metric_key == 'shimmer':
+                value_text = f"{metric_data['value']:.2f}%"
+            elif metric_key == 'hnr':
+                value_text = f"{metric_data['value']:.1f} dB"
+            else:  # strain_events
+                value_text = str(int(metric_data['value']))
+
+            # Add status emoji
+            value_text = f"{metric_data['emoji']} {value_text}"
+
+            # Update the corresponding card
+            if metric_key == 'jitter':
+                self.jitter_card.value_label.setText(value_text)
+                # Update title to plain language
+                if hasattr(self.jitter_card, 'title_label'):
+                    self.jitter_card.title_label.setText(metric_data['display_name'])
+            elif metric_key == 'shimmer':
+                self.shimmer_card.value_label.setText(value_text)
+                if hasattr(self.shimmer_card, 'title_label'):
+                    self.shimmer_card.title_label.setText(metric_data['display_name'])
+            elif metric_key == 'hnr':
+                self.hnr_card.value_label.setText(value_text)
+                if hasattr(self.hnr_card, 'title_label'):
+                    self.hnr_card.title_label.setText(metric_data['display_name'])
+            elif metric_key == 'strain_events':
+                self.strain_card.value_label.setText(value_text)
+                if hasattr(self.strain_card, 'title_label'):
+                    self.strain_card.title_label.setText(metric_data['display_name'])
+
+    def _update_summary_today(self, display_data: dict, session_count: int):
+        """Update summary text for today's view"""
+        grade = display_data['grade']
+        score = display_data['score']
+
+        summary_text = f"Today: Completed {session_count} session{'s' if session_count != 1 else ''} "
+        summary_text += f"with a vocal health grade of {grade} ({score}/100 points).\n\n"
+
+        # Add context message
+        summary_text += display_data['context_message'] + "\n\n"
+
+        # Add action message
+        summary_text += display_data['action_message']
+
+        self.summary_label.setText(summary_text)
 
     def _update_advanced_metrics(self, all_sessions):
         """Update advanced safety metrics: fatigue, rest, recovery"""

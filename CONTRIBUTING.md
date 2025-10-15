@@ -48,6 +48,9 @@ pip install -r requirements.txt
 
 # Run the app
 python main.py
+
+# Run tests
+python run_tests.py all
 ```
 
 ## Code Style Guidelines
@@ -64,20 +67,49 @@ python main.py
 3. **Error Handling**: Use `log_error()` from `utils/error_handler.py`
 4. **Design System**: Follow `gui/design_system.py` for UI consistency
 
+### Testing
+- Add tests for new features in `tests/`
+- Use pytest fixtures from `conftest.py`
+- Mark tests appropriately: `@pytest.mark.unit` or `@pytest.mark.integration`
+- Aim for 80%+ coverage on core modules
+
+## Project Structure
+
+See `AGENTS.md` for detailed architecture information.
+
 ## Documentation
 
 - Update README.md if adding user-facing features
+- Update CLAUDE.md if changing architecture
 - Add docstrings to new functions/classes
 - Update type hints
+
+## Testing Guidelines
+
+```bash
+# Run all tests
+python run_tests.py all
+
+# Run only unit tests
+python run_tests.py unit
+
+# Run with coverage
+python run_tests.py coverage
+
+# Run specific test
+pytest tests/test_session_manager.py -v
+```
 
 ## Privacy & Safety Principles
 
 1. **Privacy-First**: All data local, no telemetry, explicit export only
 2. **Safety-First**: Auto-pause on strain, research-based thresholds
 3. **Inclusive**: MTF/FTM/NB support, non-prescriptive language
+4. **Not Medical**: Always disclaim medical advice
 
 ## Areas Needing Help
 
+- Adding new voice exercises with proper research backing
 - Improving audio analysis accuracy
 - UI/UX enhancements
 - Documentation improvements
