@@ -520,7 +520,7 @@ class VoiceSessionManager:
             from utils.error_handler import log_error
             log_error(e, "SessionManager.save_progress_data")
             return False
-    
+
     def get_progress_trends(self):
         """Analyze progress trends from session history"""
         if len(self.weekly_sessions) < 2:

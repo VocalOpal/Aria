@@ -1,0 +1,16 @@
+{
+  "profiles": [
+    {
+      "id": "c25ffb39-e5c6-4748-b71e-dc9d080c76ee",
+      "name": "My Voice Training",
+      "icon": "\ud83c\udfa4",
+      "goal_range": [
+        140,
+        200
+      ],
+      "preset": "neutral",
+      "created_date": "2025-10-15T22:53:18.703855"
+    }
+  ],
+  "current_profile_id": null
+}
