@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """
 ExerciseRunner - Clean inline runner panel for active exercises.
 

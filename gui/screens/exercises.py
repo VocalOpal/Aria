@@ -333,8 +333,9 @@ class ExerciseRunnerView(QWidget):
                 'timestamp': import_time_now().isoformat()
             }
 
-            # TODO: Save to session_manager when exercise history is implemented
-            # self.voice_trainer.session_manager.save_exercise_result(progress_data)
+            # Save exercise result to session manager (if method exists)
+            if hasattr(self.voice_trainer.session_manager, 'save_exercise_result'):
+                self.voice_trainer.session_manager.save_exercise_result(progress_data)
 
         except Exception as e:
             from utils.error_handler import log_error

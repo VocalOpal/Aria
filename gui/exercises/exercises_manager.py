@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """
 ExercisesManager - Main coordinator for exercises UI with list + detail panes.
 
@@ -395,5 +396,5 @@ class ExercisesManager(QWidget):
     def cleanup(self):
         """Clean up resources"""
         if self.current_runner:
-            self.current_runner.stop()
+            self.current_runner.cleanup()
             self.current_runner = None

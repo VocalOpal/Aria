@@ -80,6 +80,7 @@ See `AGENTS.md` for detailed architecture information.
 ## Documentation
 
 - Update README.md if adding user-facing features
+- Update CLAUDE.md if changing architecture
 - Add docstrings to new functions/classes
 - Update type hints
 
