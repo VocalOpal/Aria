@@ -65,7 +65,13 @@ class VoiceConfigurationManager:
             'auto_pause_on_strain': True,
             # Session settings
             'auto_save_sessions': True,
-            'sample_rate': 44100
+            'sample_rate': 44100,
+            # Audio device selection
+            'input_device_index': None,
+            'input_device_name': 'System Default',
+            # Update settings
+            'update_repo_owner': 'hopefulopal',
+            'update_repo_name': 'aria-voice-studio'
         }
         
         # Current configuration

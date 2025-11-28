@@ -57,6 +57,17 @@ class ModernPitchVisualizer(QWidget):
             self.pitch_animation.setEndValue(pitch_value)
             self.pitch_animation.start()
 
+    def set_target_pitch(self, target_value: float):
+        """Set target pitch for goal indicator."""
+        self.target_pitch = target_value
+        self.update()
+
+    def reset(self):
+        """Clear pitch display to neutral state."""
+        self.pitch = 0
+        self._animated_pitch = 0
+        self.update()
+
     def animate(self):
         """Animation step"""
         self.phase += 0.08

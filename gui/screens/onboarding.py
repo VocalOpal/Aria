@@ -1,7 +1,7 @@
 """Modern onboarding screen with multi-step setup wizard."""
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QStackedWidget, QPushButton
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QStackedWidget, QPushButton, QComboBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QFont
@@ -11,12 +11,13 @@ from ..design_system import (
     InfoCard, PrimaryButton, SecondaryButton, create_gradient_background,
     StyledComboBox, BodyLabel, CaptionLabel, create_styled_progress_bar, add_card_shadow
 )
+from utils.emoji_handler import convert_emoji_text
 
 
 class ModernStepIndicator(QWidget):
     """Modern step indicator with animated progress"""
     
-    def __init__(self, total_steps=4):
+    def __init__(self, total_steps=5):
         super().__init__()
         self.total_steps = total_steps
         self.current = 0
@@ -364,7 +365,11 @@ class VoiceGoalsStep(OnboardingStep):
             "165-265 Hz",
             {
                 "voice_goals": "Feminine voice development (MTF)",
-                "voice_preset": "MTF - Feminine voice training (165-265 Hz)",
+                "voice_preset": "MTF - Feminine voice training",
+                "voice_goal_description": "Feminine Range (165-265 Hz)",
+                "current_preset": "mtf",
+                "profile_icon": convert_emoji_text("🎤"),
+                "profile_name": "My Voice Training",
                 "base_goal": 165,
                 "current_goal": 165,
                 "goal_increment": 3,
@@ -382,7 +387,11 @@ class VoiceGoalsStep(OnboardingStep):
             "85-165 Hz",
             {
                 "voice_goals": "Masculine voice development (FTM)",
-                "voice_preset": "FTM - Masculine voice training (85-165 Hz)",
+                "voice_preset": "FTM - Masculine voice training",
+                "voice_goal_description": "Masculine Range (85-165 Hz)",
+                "current_preset": "ftm",
+                "profile_icon": convert_emoji_text("🎤"),
+                "profile_name": "My Voice Training",
                 "base_goal": 120,
                 "current_goal": 120,
                 "goal_increment": -3,
@@ -407,6 +416,10 @@ class VoiceGoalsStep(OnboardingStep):
             {
                 "voice_goals": "Non-binary voice development (Higher)",
                 "voice_preset": "Non-Binary (Higher) - Androgynous with elevation",
+                "voice_goal_description": "Androgynous (Higher) Range (145-220 Hz)",
+                "current_preset": "nonbinary_higher",
+                "profile_icon": convert_emoji_text("🎤"),
+                "profile_name": "My Voice Training",
                 "base_goal": 180,
                 "current_goal": 180,
                 "goal_increment": 2,
@@ -425,6 +438,10 @@ class VoiceGoalsStep(OnboardingStep):
             {
                 "voice_goals": "Non-binary voice development (Lower)",
                 "voice_preset": "Non-Binary (Lower) - Androgynous with deepening",
+                "voice_goal_description": "Androgynous (Lower) Range (100-200 Hz)",
+                "current_preset": "nonbinary_lower",
+                "profile_icon": convert_emoji_text("🎤"),
+                "profile_name": "My Voice Training",
                 "base_goal": 140,
                 "current_goal": 140,
                 "goal_increment": -2,
@@ -449,6 +466,10 @@ class VoiceGoalsStep(OnboardingStep):
             {
                 "voice_goals": "Custom voice development",
                 "voice_preset": "Custom - Manual configuration",
+                "voice_goal_description": "Custom Range (120-220 Hz)",
+                "current_preset": "custom",
+                "profile_icon": convert_emoji_text("🎤"),
+                "profile_name": "My Voice Training",
                 "base_goal": 180,
                 "current_goal": 180,
                 "goal_increment": 0,
@@ -481,6 +502,125 @@ class VoiceGoalsStep(OnboardingStep):
     def get_data(self):
         """Return selected preset data"""
         return self.selected_preset if self.selected_preset else self.preset_cards[0].preset_data
+
+
+class InputDeviceStep(OnboardingStep):
+    """Microphone selection step"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.devices = []
+        self.selected_device = None
+        self.init_ui()
+        self.load_devices()
+
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(AriaSpacing.GIANT, AriaSpacing.XL, AriaSpacing.GIANT, AriaSpacing.XL)
+        layout.setSpacing(AriaSpacing.XL)
+
+        title = QLabel("Choose Your Microphone")
+        title.setStyleSheet(f"""
+            color: white;
+            font-size: {AriaTypography.TITLE}px;
+            font-weight: 700;
+            background: transparent;
+        """)
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+
+        desc = QLabel("Select the input device you want Aria to use for training.")
+        desc.setStyleSheet(f"""
+            color: {AriaColors.WHITE_85};
+            font-size: {AriaTypography.BODY}px;
+            background: transparent;
+        """)
+        desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+
+        layout.addSpacing(AriaSpacing.LG)
+
+        device_row = QHBoxLayout()
+        device_row.setSpacing(AriaSpacing.MD)
+        device_row.addStretch()
+
+        self.device_combo = QComboBox()
+        self.device_combo.setStyleSheet(f"""
+            QComboBox {{
+                background-color: rgba(255,255,255,0.1);
+                border: 1px solid {AriaColors.WHITE_25};
+                border-radius: {AriaRadius.MD}px;
+                padding: {AriaSpacing.SM}px {AriaSpacing.LG}px;
+                color: white;
+                min-width: 320px;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {AriaColors.SIDEBAR_MEDIUM};
+                border: 1px solid {AriaColors.WHITE_25};
+                color: white;
+                selection-background-color: {AriaColors.TEAL};
+            }}
+        """)
+        self.device_combo.currentIndexChanged.connect(self.on_device_changed)
+        device_row.addWidget(self.device_combo)
+
+        refresh_btn = SecondaryButton("Refresh Devices")
+        refresh_btn.clicked.connect(self.load_devices)
+        device_row.addWidget(refresh_btn)
+
+        device_row.addStretch()
+        layout.addLayout(device_row)
+
+        hint = QLabel("Tip: If your microphone isn't listed, ensure it's connected and not in use by another app, then click Refresh.")
+        hint.setStyleSheet(f"color: {AriaColors.WHITE_70}; font-size: {AriaTypography.CAPTION}px; background: transparent;")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+
+        layout.addStretch()
+
+    def load_devices(self):
+        """Load available input devices using PyAudio"""
+        self.devices = []
+        self.device_combo.clear()
+        try:
+            import pyaudio
+            pa = pyaudio.PyAudio()
+            count = pa.get_device_count()
+            for idx in range(count):
+                info = pa.get_device_info_by_index(idx)
+                if info.get('maxInputChannels', 0) > 0:
+                    name = info.get('name', f"Device {idx}")
+                    self.devices.append({'index': idx, 'name': name})
+                    self.device_combo.addItem(name, idx)
+            pa.terminate()
+        except Exception:
+            # Fallback to system default
+            self.device_combo.addItem("System Default", None)
+            self.devices.append({'index': None, 'name': "System Default"})
+
+        if self.device_combo.count() == 0:
+            self.device_combo.addItem("System Default", None)
+            self.devices.append({'index': None, 'name': "System Default"})
+
+        self.device_combo.setCurrentIndex(0)
+        self.on_device_changed(0)
+
+    def on_device_changed(self, idx):
+        if idx < 0 or idx >= self.device_combo.count():
+            return
+        self.selected_device = {
+            'input_device_index': self.device_combo.currentData(),
+            'input_device_name': self.device_combo.currentText()
+        }
+
+    def get_data(self):
+        if self.selected_device is None and self.devices:
+            self.selected_device = {
+                'input_device_index': self.devices[0]['index'],
+                'input_device_name': self.devices[0]['name']
+            }
+        return self.selected_device or {'input_device_index': None, 'input_device_name': 'System Default'}
 
 
 class SafetyTipsStep(OnboardingStep):
@@ -787,6 +927,7 @@ class OnboardingScreen(QWidget):
         self.steps = [
             WelcomeStep(),
             VoiceGoalsStep(),
+            InputDeviceStep(),
             SafetyTipsStep(),
             FinishStep()
         ]
@@ -865,12 +1006,64 @@ class OnboardingScreen(QWidget):
 
     def complete_onboarding(self):
         """Complete onboarding with collected data"""
-        # Collect data from voice goals step
+        # Collect data from voice goals and device selection steps
         goals_step = self.steps[1]
-        self.config = goals_step.get_data()
+        device_step = self.steps[2]
+
+        selection = goals_step.get_data()
+        device_data = device_step.get_data()
+        merged = {}
+        if isinstance(selection, dict):
+            merged.update(selection)
+        if isinstance(device_data, dict):
+            merged.update(device_data)
+
+        self.config = self._normalize_onboarding_config(merged)
 
         self.onboarding_completed.emit(self.config)
 
     def skip_onboarding(self):
         """Skip onboarding and use defaults"""
         self.onboarding_cancelled.emit()
+
+    def _normalize_onboarding_config(self, selection: dict) -> dict:
+        """Normalize onboarding payload with defaults and derived fields."""
+        config = selection.copy() if selection else {}
+
+        target_range = config.get('target_pitch_range', [165, 265])
+        if isinstance(target_range, tuple):
+            target_range = list(target_range)
+        config['target_pitch_range'] = target_range
+
+        if 'voice_goal_description' not in config and len(target_range) == 2:
+            config['voice_goal_description'] = f"{config.get('voice_preset', 'Custom')} ({target_range[0]}-{target_range[1]} Hz)"
+
+        preset_key = config.get('current_preset') or self._infer_preset_key(config)
+        if preset_key:
+            config['current_preset'] = preset_key
+
+        config['profile_icon'] = convert_emoji_text(str(config.get('profile_icon', "🎤")))
+        config.setdefault('profile_name', "My Voice Training")
+
+        return config
+
+    def _infer_preset_key(self, config: dict) -> str:
+        """Infer preset key from textual selection for backward compatibility."""
+        text = ""
+        for field in ('current_preset', 'voice_preset', 'voice_goals'):
+            candidate = config.get(field)
+            if isinstance(candidate, str) and candidate:
+                text = candidate.lower()
+                break
+
+        if 'mtf' in text or 'feminine' in text:
+            return 'mtf'
+        if 'ftm' in text or 'masculine' in text:
+            return 'ftm'
+        if 'higher' in text:
+            return 'nonbinary_higher'
+        if 'lower' in text:
+            return 'nonbinary_lower'
+        if 'neutral' in text or 'androgynous' in text:
+            return 'neutral'
+        return 'custom'

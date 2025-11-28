@@ -51,7 +51,7 @@ class VoiceTrainingController:
             return False
             
         # Initialize audio system
-        if not self.audio_manager.start_processing(self._create_audio_callback(config, ui_callback)):
+        if not self.audio_manager.start_processing(self._create_audio_callback(config, ui_callback), config):
             return False
         
         # Start session tracking
@@ -141,7 +141,7 @@ class VoiceTrainingController:
             self.progress_tracker.start_session(exercise_name)
         
         # Initialize audio system with exercise-specific callback
-        if not self.audio_manager.start_processing(self._create_exercise_callback(ui_callback)):
+        if not self.audio_manager.start_processing(self._create_exercise_callback(ui_callback), None):
             self.current_exercise = None
             return False
         

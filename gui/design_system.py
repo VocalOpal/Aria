@@ -697,6 +697,10 @@ class StyledSpinBox(QSpinBox):
             }}
         """)
 
+    def wheelEvent(self, event):
+        """Ignore scroll wheel to prevent accidental changes while scrolling."""
+        event.ignore()
+
 
 class StyledDoubleSpinBox(QDoubleSpinBox):
     """DoubleSpinBox with consistent styling"""
@@ -722,6 +726,10 @@ class StyledDoubleSpinBox(QDoubleSpinBox):
                 width: 16px;
             }}
         """)
+
+    def wheelEvent(self, event):
+        """Ignore scroll wheel to prevent accidental changes while scrolling."""
+        event.ignore()
 
 
 class StyledCheckBox(QCheckBox):

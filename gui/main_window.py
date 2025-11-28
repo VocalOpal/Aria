@@ -364,15 +364,22 @@ class AriaMainWindow(QMainWindow):
     def on_onboarding_completed(self, config):
         """Handle onboarding completion"""
         try:
+            profile = None
+            if hasattr(self.voice_trainer, 'profile_manager'):
+                profile = self.voice_trainer.profile_manager.apply_onboarding_config(config)
+                if not profile and not self.voice_trainer.profile_manager.profiles:
+                    profile = self.voice_trainer.profile_manager._create_default_profiles(config)
+                if profile:
+                    self.voice_trainer.config_manager.config_file = self.voice_trainer.profile_manager.get_profile_config_path(profile.id)
+                    self.voice_trainer.config_manager.load_config()
+
             self.voice_trainer.config_manager.update_config(config)
             self.voice_trainer.config_manager.mark_onboarding_complete()
             
-            # Create default profiles based on user's onboarding choices
-            if hasattr(self.voice_trainer, 'profile_manager'):
-                if not self.voice_trainer.profile_manager.profiles:
-                    self.voice_trainer.profile_manager._create_default_profiles(config)
-            
             self.restore_main_ui()
+            # Ensure all screens/UI pull the fresh profile/config values
+            if hasattr(self, 'refresh_all_screens'):
+                self.refresh_all_screens()
             self.navigate_to("live")
         except Exception as e:
             from utils.error_handler import log_error

@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
+from __init__ import __version__ as APP_VERSION
 
 from ..design_system import (
     AriaColors, AriaTypography, AriaSpacing, AriaRadius,
@@ -177,6 +178,10 @@ class SettingsScreen(QWidget):
         reset_btn = SecondaryButton("Reset to Defaults")
         reset_btn.clicked.connect(self.reset_settings)
         buttons_layout.addWidget(reset_btn)
+
+        update_btn = SecondaryButton("Check for Updates")
+        update_btn.clicked.connect(self.check_for_updates)
+        buttons_layout.addWidget(update_btn)
 
         save_btn = PrimaryButton("Save Settings")
         save_btn.clicked.connect(self.save_settings)
@@ -718,6 +723,48 @@ class SettingsScreen(QWidget):
                 self,
                 "Error",
                 f"An error occurred while saving settings:\n{str(e)}"
+            )
+
+    def refresh(self):
+        """Refresh settings UI to latest config/profile."""
+        self.load_settings()
+
+    def check_for_updates(self):
+        """Check GitHub for latest release and compare to local version."""
+        from PyQt6.QtWidgets import QMessageBox
+        import json
+        import urllib.request
+
+        config = self.config_manager.get_config()
+        owner = config.get('update_repo_owner', 'hopefulopal')
+        repo = config.get('update_repo_name', 'aria-voice-studio')
+        api_url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
+
+        try:
+            with urllib.request.urlopen(api_url, timeout=6) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+            latest = data.get('tag_name') or data.get('name') or "unknown"
+            html_url = data.get('html_url', f"https://github.com/{owner}/{repo}/releases")
+
+            local_version = APP_VERSION if APP_VERSION else "unknown"
+
+            if latest != "unknown" and local_version != "unknown" and latest.strip() == local_version.strip():
+                QMessageBox.information(
+                    self,
+                    "Up to Date",
+                    f"You're on the latest version ({local_version})."
+                )
+            else:
+                QMessageBox.information(
+                    self,
+                    "Update Available" if latest != "unknown" else "Check Updates",
+                    f"Latest release: {latest}\nYour version: {local_version}\n\nDownload: {html_url}"
+                )
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                "Update Check Failed",
+                f"Could not check for updates.\nReason: {e}"
             )
 
     def reset_settings(self):

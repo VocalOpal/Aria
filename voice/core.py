@@ -930,18 +930,24 @@ class AudioManager:
         self.error_message = None
         self.noise_floor_spectrum = None
         self.is_noise_calibrated = False
+        self.input_device_index = None
+        self.input_device_name = None
 
     def initialize_audio(self):
         """Initialize PyAudio with helpful error messages and graceful fallback"""
         try:
             self.audio = pyaudio.PyAudio()
-            self.stream = self.audio.open(
+            open_kwargs = dict(
                 format=self.analyzer.FORMAT,
                 channels=self.analyzer.CHANNELS,
                 rate=self.analyzer.RATE,
                 input=True,
                 frames_per_buffer=self.analyzer.CHUNK
             )
+            if self.input_device_index is not None:
+                open_kwargs["input_device_index"] = self.input_device_index
+
+            self.stream = self.audio.open(**open_kwargs)
             self.mock_mode = False
             self.error_message = None
             return True
@@ -1089,9 +1095,13 @@ class AudioManager:
         except Exception:
             return 0.01
 
-    def start_processing(self, callback):
+    def start_processing(self, callback, config=None):
         """Start audio processing in background thread"""
         try:
+            if config:
+                self.input_device_index = config.get('input_device_index')
+                self.input_device_name = config.get('input_device_name')
+
             if not self.initialize_audio():
                 return False
 

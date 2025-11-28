@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from ..design_system import (
     AriaColors, AriaTypography, AriaSpacing, AriaRadius,
     InfoCard, PrimaryButton, SecondaryButton, CircularProgress, create_gradient_background,
-    TitleLabel, HeadingLabel, BodyLabel, CaptionLabel, create_scroll_container
+    TitleLabel, HeadingLabel, BodyLabel, CaptionLabel, create_scroll_container, add_card_shadow
 )
 
 # Import exercise specs from old GUI
@@ -34,27 +34,20 @@ class ExerciseCard(QFrame):
         self.setMinimumHeight(200)
         self.setStyleSheet(f"""
             QFrame {{
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:1,
-                    stop:0 {AriaColors.CARD_BG_LIGHT},
-                    stop:1 {AriaColors.CARD_BG_PINK_LIGHT}
-                );
+                background-color: {AriaColors.CARD_BG};
                 border-radius: {AriaRadius.LG}px;
                 border: 1px solid {AriaColors.WHITE_25};
             }}
             QFrame:hover {{
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:1,
-                    stop:0 rgba(111, 162, 200, 0.5),
-                    stop:1 rgba(232, 151, 189, 0.5)
-                );
                 border: 1px solid {AriaColors.WHITE_45};
+                background-color: {AriaColors.CARD_BG_LIGHT};
             }}
         """)
+        add_card_shadow(self)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(AriaSpacing.XXL, AriaSpacing.XXL, AriaSpacing.XXL, AriaSpacing.XXL)
-        layout.setSpacing(AriaSpacing.MD)
+        layout.setContentsMargins(AriaSpacing.XL, AriaSpacing.XL, AriaSpacing.XL, AriaSpacing.XL)
+        layout.setSpacing(AriaSpacing.LG)
 
         # Exercise name
         layout.addWidget(HeadingLabel(self.exercise_spec.name))
@@ -418,6 +411,11 @@ class ExercisesScreen(QWidget):
         """)
         layout.addWidget(title)
 
+        subtitle = QLabel("Curated drills that match the rest of your training experience.")
+        subtitle.setStyleSheet(f"color: {AriaColors.WHITE_85}; font-size: {AriaTypography.BODY_SMALL}px; background: transparent;")
+        subtitle.setWordWrap(True)
+        layout.addWidget(subtitle)
+
         # Scroll area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -439,19 +437,9 @@ class ExercisesScreen(QWidget):
 
         for cat_key, cat_title, cat_desc in categories:
             if cat_key in self.exercises:
-                # Category header
-                cat_frame = QFrame()
-                cat_layout = QVBoxLayout(cat_frame)
-                cat_layout.setSpacing(AriaSpacing.MD)
-
-                cat_label = QLabel(cat_title)
-                cat_label.setStyleSheet(f"""
-                    color: white;
-                    font-size: {AriaTypography.HEADING}px;
-                    font-weight: 600;
-                    background: transparent;
-                """)
-                cat_layout.addWidget(cat_label)
+                # Category panel
+                cat_card = InfoCard(cat_title, min_height=200)
+                cat_card.content_layout.setSpacing(AriaSpacing.MD)
 
                 cat_desc_label = QLabel(cat_desc)
                 cat_desc_label.setStyleSheet(f"""
@@ -459,7 +447,7 @@ class ExercisesScreen(QWidget):
                     font-size: {AriaTypography.BODY_SMALL}px;
                     background: transparent;
                 """)
-                cat_layout.addWidget(cat_desc_label)
+                cat_card.content_layout.addWidget(cat_desc_label)
 
                 # Exercise grid for this category
                 grid = QGridLayout()
@@ -470,8 +458,8 @@ class ExercisesScreen(QWidget):
                     card.clicked.connect(self.start_exercise)
                     grid.addWidget(card, i // 2, i % 2)
 
-                cat_layout.addLayout(grid)
-                scroll_layout.addWidget(cat_frame)
+                cat_card.content_layout.addLayout(grid)
+                scroll_layout.addWidget(cat_card)
 
         scroll_layout.addStretch()
         scroll.setWidget(scroll_content)

@@ -10,6 +10,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from utils.file_operations import safe_save_config, safe_load_config, get_logger
+from utils.emoji_handler import convert_emoji_text
 
 
 class Profile:
@@ -232,43 +233,44 @@ class ProfileManager:
                 existing_config = safe_load_config(main_config, {})
             
             # Determine user's voice goal from config
-            voice_goals = (user_config or existing_config or {}).get('voice_goals', '')
-            preset = (user_config or existing_config or {}).get('voice_preset', '')
-            target_range = (user_config or existing_config or {}).get('target_pitch_range', [140, 200])
+            config_source = user_config or existing_config or {}
+            preset_key = self._map_config_to_preset(config_source)
+            target_range = config_source.get('target_pitch_range', [140, 200])
+            target_tuple = tuple(target_range) if isinstance(target_range, (list, tuple)) else (140, 200)
             
             # Create ONE main profile based on user's onboarding choice
             main_profile = None
             
-            if "MTF" in voice_goals or "MTF" in preset:
+            if preset_key == 'mtf':
                 main_profile = self.create_profile(
                     name="My Voice Training",
                     icon="🎤",
-                    goal_range=tuple(target_range) if isinstance(target_range, list) else (165, 220),
+                    goal_range=target_tuple if len(target_tuple) == 2 else (165, 220),
                     preset="mtf"
                 )
                 
-            elif "FTM" in voice_goals or "FTM" in preset:
+            elif preset_key == 'ftm':
                 main_profile = self.create_profile(
                     name="My Voice Training",
                     icon="🎤",
-                    goal_range=tuple(target_range) if isinstance(target_range, list) else (85, 165),
+                    goal_range=target_tuple if len(target_tuple) == 2 else (85, 165),
                     preset="ftm"
                 )
                 
-            elif "Higher" in voice_goals or "Higher" in preset:
+            elif preset_key == 'nonbinary_higher':
                 main_profile = self.create_profile(
                     name="My Voice Training",
                     icon="🎤",
-                    goal_range=tuple(target_range) if isinstance(target_range, list) else (145, 220),
-                    preset="neutral"
+                    goal_range=target_tuple if len(target_tuple) == 2 else (145, 220),
+                    preset="nonbinary_higher"
                 )
                 
-            elif "Lower" in voice_goals or "Lower" in preset:
+            elif preset_key == 'nonbinary_lower':
                 main_profile = self.create_profile(
                     name="My Voice Training",
                     icon="🎤",
-                    goal_range=tuple(target_range) if isinstance(target_range, list) else (100, 165),
-                    preset="neutral"
+                    goal_range=target_tuple if len(target_tuple) == 2 else (100, 165),
+                    preset="nonbinary_lower"
                 )
                 
             else:
@@ -276,8 +278,8 @@ class ProfileManager:
                 main_profile = self.create_profile(
                     name="My Voice Training",
                     icon="🎤",
-                    goal_range=tuple(target_range) if isinstance(target_range, list) else (130, 200),
-                    preset="neutral"
+                    goal_range=target_tuple if len(target_tuple) == 2 else (130, 200),
+                    preset="nonbinary_neutral"
                 )
             
             # Copy existing config to main profile if it exists
@@ -291,7 +293,71 @@ class ProfileManager:
             
             # Backup on initial profile creation (one-time)
             self.save_profiles(create_backup=True)
-            self.logger.info(f"Created default profile based on user goal: {voice_goals}")
+            self.logger.info(f"Created default profile based on user goal: {config_source.get('voice_goals', '')}")
+            return main_profile
             
         except Exception as e:
             self.logger.error(f"Error creating default profiles: {e}")
+            return None
+
+    def apply_onboarding_config(self, user_config: Dict[str, Any]) -> Optional[Profile]:
+        """
+        Apply onboarding selection to the active profile and sync config file.
+        """
+        try:
+            if not user_config:
+                return None
+
+            preset_key = self._map_config_to_preset(user_config)
+            target_range = user_config.get('target_pitch_range', [140, 200])
+            target_tuple = tuple(target_range) if isinstance(target_range, (list, tuple)) else (140, 200)
+            profile_name = user_config.get('profile_name', "My Voice Training")
+            profile_icon = convert_emoji_text(str(user_config.get('profile_icon', "🎤")))
+
+            # Prefer current profile; fall back to first available
+            profile = self.get_current() if self.profiles else None
+            if profile is None and self.profiles:
+                profile = next(iter(self.profiles.values()), None)
+
+            preset_for_profile = preset_key or 'custom'
+
+            if profile is None:
+                profile = self.create_profile(profile_name, profile_icon, target_tuple, preset_for_profile)
+            else:
+                profile.name = profile_name or profile.name
+                profile.icon = profile_icon or profile.icon
+                profile.goal_range = target_tuple
+                profile.preset = preset_for_profile
+                self.current_profile_id = profile.id
+                self.save_profiles()
+
+            if profile:
+                config_path = self.get_profile_config_path(profile.id)
+                config_data = safe_load_config(config_path, {})
+                config_data.update(user_config)
+                safe_save_config(config_data, config_path)
+
+            return profile
+        except Exception as e:
+            self.logger.error(f"Error applying onboarding config: {e}")
+            return None
+
+    def _map_config_to_preset(self, config: Dict[str, Any]) -> str:
+        """Map mixed onboarding/config fields to a preset key."""
+        preset_field = config.get('current_preset') or config.get('voice_preset') or config.get('voice_goals', '')
+        text = preset_field.lower() if isinstance(preset_field, str) else ''
+
+        if 'mtf' in text or 'feminine' in text:
+            return 'mtf'
+        if 'ftm' in text or 'masculine' in text:
+            return 'ftm'
+        if 'higher' in text:
+            return 'nonbinary_higher'
+        if 'lower' in text:
+            return 'nonbinary_lower'
+        if 'neutral' in text or 'androgynous' in text:
+            return 'nonbinary_neutral'
+        if 'custom' in text:
+            return 'custom'
+        return 'custom'
+        return 'custom'

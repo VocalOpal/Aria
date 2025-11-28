@@ -80,8 +80,13 @@ class TrainingScreen(QWidget):
         layout.setSpacing(AriaSpacing.XL)
 
         # === Quick Start Section with Emergency Stop ===
-        quick_start_card = self.create_quick_start_section()
-        layout.addWidget(quick_start_card)
+        self.quick_start_card = self.create_quick_start_section()
+        layout.addWidget(self.quick_start_card)
+        self.quick_start_collapsed = False
+        self.quick_start_show_btn = SecondaryButton("Show Quick Start")
+        self.quick_start_show_btn.setVisible(False)
+        self.quick_start_show_btn.clicked.connect(self.toggle_quick_start)
+        layout.addWidget(self.quick_start_show_btn, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # === Visualizer Card ===
         visualizer_card = QFrame()
@@ -116,11 +121,11 @@ class TrainingScreen(QWidget):
         self.analytics_card = InfoCard("Session Stats", min_height=260)  # Increased height
         self.analytics_card.content_layout.addStretch()
 
-        # Current pitch display - large and centered
-        self.pitch_label = QLabel("185 Hz")
-        self.pitch_label.setStyleSheet(f"color: white; font-size: {AriaTypography.HEADING}px; font-weight: 700; background: transparent; margin: 4px 0;")
-        self.pitch_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.analytics_card.content_layout.addWidget(self.pitch_label)
+        # Average pitch display - large and centered (primary metric)
+        self.avg_pitch_label = QLabel("--")
+        self.avg_pitch_label.setStyleSheet(f"color: white; font-size: {AriaTypography.HEADING}px; font-weight: 700; background: transparent; margin: 4px 0;")
+        self.avg_pitch_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.analytics_card.content_layout.addWidget(self.avg_pitch_label)
 
         # Spacing between pitch and metrics
         self.analytics_card.content_layout.addSpacing(8)
@@ -146,24 +151,24 @@ class TrainingScreen(QWidget):
 
         self.analytics_card.content_layout.addSpacing(6)
 
-        # Avg Pitch metric - centered
-        avg_container = QWidget()
-        avg_container.setStyleSheet("background: transparent;")
-        avg_layout = QVBoxLayout(avg_container)
-        avg_layout.setContentsMargins(0, 0, 0, 0)
-        avg_layout.setSpacing(2)
+        # Live Pitch metric - centered (secondary)
+        live_container = QWidget()
+        live_container.setStyleSheet("background: transparent;")
+        live_layout = QVBoxLayout(live_container)
+        live_layout.setContentsMargins(0, 0, 0, 0)
+        live_layout.setSpacing(2)
         
-        avg_label = QLabel("Avg Pitch")
-        avg_label.setStyleSheet(f"color: {AriaColors.WHITE_85}; font-size: {AriaTypography.CAPTION}px; font-weight: 500; background: transparent;")
-        avg_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        avg_layout.addWidget(avg_label)
+        live_label = QLabel("Live Pitch")
+        live_label.setStyleSheet(f"color: {AriaColors.WHITE_85}; font-size: {AriaTypography.CAPTION}px; font-weight: 500; background: transparent;")
+        live_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        live_layout.addWidget(live_label)
         
-        self.avg_value = QLabel("185 Hz")
-        self.avg_value.setStyleSheet(f"color: white; font-size: {AriaTypography.BODY_SMALL}px; font-weight: 600; background: transparent;")
-        self.avg_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        avg_layout.addWidget(self.avg_value)
+        self.live_value = QLabel("--")
+        self.live_value.setStyleSheet(f"color: white; font-size: {AriaTypography.BODY_SMALL}px; font-weight: 600; background: transparent;")
+        self.live_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        live_layout.addWidget(self.live_value)
         
-        self.analytics_card.content_layout.addWidget(avg_container)
+        self.analytics_card.content_layout.addWidget(live_container)
 
         self.analytics_card.content_layout.addSpacing(6)
 
@@ -179,7 +184,7 @@ class TrainingScreen(QWidget):
         stability_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         stability_layout.addWidget(stability_label)
         
-        self.stability_value = QLabel("78%")
+        self.stability_value = QLabel("--%")
         self.stability_value.setStyleSheet(f"color: white; font-size: {AriaTypography.BODY_SMALL}px; font-weight: 600; background: transparent;")
         self.stability_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
         stability_layout.addWidget(self.stability_value)
@@ -189,9 +194,9 @@ class TrainingScreen(QWidget):
         self.analytics_card.content_layout.addStretch()
         
         # Keep references for backward compatibility
-        self.hz_value_top = self.pitch_label
+        self.hz_value_top = self.avg_pitch_label
         self.duration_metric = duration_container
-        self.avg_metric = avg_container
+        self.avg_metric = live_container  # Previously average metric; now displays live pitch
         self.stability_metric = stability_container
         
         # Create hidden widgets for resonance/formant to prevent errors
@@ -312,6 +317,7 @@ class TrainingScreen(QWidget):
         layout.addLayout(controls)
 
         main_layout.addWidget(content)
+        self._reset_stats_display()
 
     def create_quick_start_section(self):
         """Create Quick Start section with template buttons and emergency stop"""
@@ -370,6 +376,12 @@ class TrainingScreen(QWidget):
         self.emergency_stop_btn.clicked.connect(self.emergency_stop)
         self.emergency_stop_btn.hide()
         header_row.addWidget(self.emergency_stop_btn)
+
+        # Collapse/expand button
+        self.quick_start_toggle_btn = SecondaryButton("Hide Quick Start")
+        self.quick_start_toggle_btn.setMinimumWidth(140)
+        self.quick_start_toggle_btn.clicked.connect(self.toggle_quick_start)
+        header_row.addWidget(self.quick_start_toggle_btn)
         
         qs_layout.addLayout(header_row)
         
@@ -389,6 +401,17 @@ class TrainingScreen(QWidget):
         self.emergency_shortcut.activated.connect(self.emergency_stop)
         
         return quick_start_frame
+
+    def toggle_quick_start(self):
+        """Collapse or expand the quick start section."""
+        self.quick_start_collapsed = not getattr(self, 'quick_start_collapsed', False)
+        self.quick_start_card.setVisible(not self.quick_start_collapsed)
+        self.quick_start_show_btn.setVisible(self.quick_start_collapsed)
+        if self.quick_start_toggle_btn:
+            if self.quick_start_collapsed:
+                self.quick_start_toggle_btn.setText("Show Quick Start")
+            else:
+                self.quick_start_toggle_btn.setText("Hide Quick Start")
 
     def create_template_button(self, template):
         """Create a styled template button"""
@@ -501,11 +524,8 @@ class TrainingScreen(QWidget):
             # Get safety monitor (we handle UI updates directly, no coordinator needed)
             self.safety_monitor = self.voice_trainer.factory.get_component('safety_monitor')
 
-            # Load target range from config
-            config = self.voice_trainer.config_manager.get_config()
-            target_range = config.get('target_pitch_range', [165, 265])
-            goal_description = config.get('voice_goal_description', 'Feminine Range (165-220 Hz)')
-            self.range_label.setText(goal_description)
+            # Load target range and descriptors from config
+            self._apply_goal_from_config()
 
         except Exception as e:
             from utils.error_handler import log_error
@@ -534,6 +554,7 @@ class TrainingScreen(QWidget):
             self.current_pitch = 0
             self.smoothed_pitch = 0
             self.audio_buffer.clear()
+            self._reset_stats_display()
 
             # Update UI
             self.start_btn.setText("Stop Training")
@@ -738,9 +759,7 @@ class TrainingScreen(QWidget):
             # Update pitch display
             current_pitch = self.current_pitch
             if current_pitch > 0:
-                self.visualizer.set_pitch(current_pitch)
-                self.pitch_label.setText(f"{int(current_pitch)} Hz")
-                self.hz_value_top.setText(f"{int(current_pitch)} Hz")
+                self.live_value.setText(f"{int(current_pitch)} Hz")
 
             # Update duration
             if self.session_start_time:
@@ -753,7 +772,10 @@ class TrainingScreen(QWidget):
             # Update average pitch
             if len(self.pitch_readings) > 0:
                 avg_pitch = sum(self.pitch_readings) / len(self.pitch_readings)
-                self.avg_value.setText(f"{int(avg_pitch)} Hz")
+                self.avg_pitch_label.setText(f"{int(avg_pitch)} Hz")
+                self.hz_value_top.setText(f"{int(avg_pitch)} Hz")
+                if self.visualizer:
+                    self.visualizer.set_pitch(avg_pitch)
 
             # Update stability (based on pitch variance)
             if len(self.pitch_readings) > 10:
@@ -867,6 +889,62 @@ class TrainingScreen(QWidget):
         # Toggle spectrogram based on settings
         show_spec = config.get('show_spectrogram', False)
         self.toggle_spectrogram(show_spec)
+
+    def refresh(self):
+        """Refresh UI to reflect latest config/profile changes."""
+        self._apply_goal_from_config()
+        self.refresh_from_settings()
+
+    def _apply_goal_from_config(self):
+        """Apply goal descriptor and range from current config."""
+        try:
+            config = self.voice_trainer.config_manager.get_config()
+            target_range = config.get('target_pitch_range', [165, 265])
+            if isinstance(target_range, tuple):
+                target_range = list(target_range)
+
+            # Derive descriptor based on preset/direction
+            preset_text = (config.get('voice_preset') or config.get('current_preset') or '').lower()
+            goal_direction = config.get('goal_increment', 0)
+
+            if 'ftm' in preset_text or goal_direction < 0:
+                descriptor = "Masculine Range"
+            elif 'mtf' in preset_text or goal_direction > 0:
+                descriptor = "Feminine Range"
+            elif 'higher' in preset_text:
+                descriptor = "Androgynous (Higher) Range"
+            elif 'lower' in preset_text:
+                descriptor = "Androgynous (Lower) Range"
+            else:
+                descriptor = "Neutral Range"
+
+            custom_desc = config.get('voice_goal_description')
+            label_text = custom_desc if custom_desc else f"{descriptor} ({int(target_range[0])}-{int(target_range[1])} Hz)"
+            self.range_label.setText(label_text)
+
+            # Move goal indicator on visualizer to midpoint of target range
+            if target_range and len(target_range) == 2 and self.visualizer:
+                midpoint = (target_range[0] + target_range[1]) / 2
+                self.visualizer.set_target_pitch(midpoint)
+        except Exception:
+            # Fallback to neutral descriptor to avoid UI breakage
+            self.range_label.setText("Neutral Range")
+
+    def _reset_stats_display(self):
+        """Show neutral placeholders before/after sessions."""
+        try:
+            self.avg_pitch_label.setText("--")
+            self.live_value.setText("--")
+            self.duration_value.setText("00:00:00")
+            self.stability_value.setText("--%")
+            if hasattr(self, 'progress_widget'):
+                self.progress_widget.set_percentage(0)
+            if hasattr(self, 'complete_label'):
+                self.complete_label.setText("0% Complete")
+            if hasattr(self, 'visualizer') and self.visualizer:
+                self.visualizer.reset()
+        except Exception:
+            pass
     
     def cleanup(self):
         """Cleanup resources"""
