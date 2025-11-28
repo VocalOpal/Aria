@@ -70,8 +70,8 @@ class VoiceConfigurationManager:
             'input_device_index': None,
             'input_device_name': 'System Default',
             # Update settings
-            'update_repo_owner': 'hopefulopal',
-            'update_repo_name': 'aria-voice-studio'
+            'update_repo_owner': 'VocalOpal',
+            'update_repo_name': 'Aria'
         }
         
         # Current configuration

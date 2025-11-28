@@ -1,11 +1,19 @@
 """Settings screen with configuration management."""
 
+import shutil
+import subprocess
+import sys
+import tempfile
+import zipfile
+from pathlib import Path
+
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QMessageBox, QPushButton
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QMessageBox, QPushButton, QApplication
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from __init__ import __version__ as APP_VERSION
+from utils.error_handler import log_error
 
 from ..design_system import (
     AriaColors, AriaTypography, AriaSpacing, AriaRadius,
@@ -746,6 +754,7 @@ class SettingsScreen(QWidget):
                 data = json.loads(resp.read().decode('utf-8'))
             latest = data.get('tag_name') or data.get('name') or "unknown"
             html_url = data.get('html_url', f"https://github.com/{owner}/{repo}/releases")
+            zip_url = data.get('zipball_url')
 
             local_version = APP_VERSION if APP_VERSION else "unknown"
 
@@ -756,16 +765,84 @@ class SettingsScreen(QWidget):
                     f"You're on the latest version ({local_version})."
                 )
             else:
-                QMessageBox.information(
+                reply = QMessageBox.question(
                     self,
                     "Update Available" if latest != "unknown" else "Check Updates",
-                    f"Latest release: {latest}\nYour version: {local_version}\n\nDownload: {html_url}"
+                    f"Latest release: {latest}\nYour version: {local_version}\n\nDownload and install now?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes
                 )
+                if reply == QMessageBox.StandardButton.Yes and zip_url:
+                    self._download_and_install_update(zip_url, latest, html_url)
+                else:
+                    QMessageBox.information(
+                        self,
+                        "Update Link",
+                        f"Download the latest release here:\n{html_url}"
+                    )
         except Exception as e:
             QMessageBox.warning(
                 self,
                 "Update Check Failed",
                 f"Could not check for updates.\nReason: {e}"
+            )
+
+    def _download_and_install_update(self, zip_url: str, latest_tag: str, release_url: str) -> None:
+        """Download latest release zip, overlay code (preserving data), and restart."""
+        from PyQt6.QtWidgets import QMessageBox
+        import urllib.request
+        try:
+            tmp_dir = Path(tempfile.mkdtemp(prefix="aria_update_"))
+            zip_path = tmp_dir / f"aria-{latest_tag or 'latest'}.zip"
+
+            # Download archive
+            with urllib.request.urlopen(zip_url, timeout=30) as resp, open(zip_path, "wb") as f:
+                shutil.copyfileobj(resp, f)
+
+            # Extract
+            extract_dir = tmp_dir / "extracted"
+            extract_dir.mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                zf.extractall(extract_dir)
+
+            extracted_roots = [p for p in extract_dir.iterdir() if p.is_dir()]
+            if not extracted_roots:
+                raise RuntimeError("Downloaded archive was empty.")
+
+            new_root = extracted_roots[0]
+            app_root = Path(__file__).resolve().parents[2]
+
+            preserve = {"data", "logs", ".git", ".github", "__pycache__", "venv", "env"}
+
+            # Overlay new files into current app (preserve data/logs and virtualenvs)
+            for item in new_root.iterdir():
+                if item.name in preserve:
+                    continue
+                dest = app_root / item.name
+                if item.is_dir():
+                    shutil.copytree(item, dest, dirs_exist_ok=True)
+                else:
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(item, dest)
+
+            QMessageBox.information(
+                self,
+                "Update Installed",
+                f"Aria has been updated to {latest_tag}.\nThe app will restart now."
+            )
+
+            # Restart app from updated codebase
+            python = sys.executable
+            main_path = app_root / "main.py"
+            subprocess.Popen([python, str(main_path)], close_fds=True)
+            QApplication.instance().quit()
+
+        except Exception as e:
+            log_error(e, "SettingsScreen._download_and_install_update")
+            QMessageBox.warning(
+                self,
+                "Update Failed",
+                f"Could not install the update.\n\nDownload manually:\n{release_url}\n\nReason: {e}"
             )
 
     def reset_settings(self):
