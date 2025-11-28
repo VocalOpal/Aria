@@ -1,0 +1,10 @@
+{
+  "base_goal": 140,
+  "current_goal": 140,
+  "goal_increment": 0,
+  "high_pitch_threshold": 350,
+  "dip_tolerance_duration": 7.0,
+  "sensitivity": 1.0,
+  "current_preset": "nonbinary_neutral",
+  "preset_applied_date": "\"1764359239.9091344\""
+}
