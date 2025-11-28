@@ -4,7 +4,7 @@ Profile Switcher Component - Switch between voice training profiles
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
-    QDialog, QLineEdit, QDialogButtonBox, QMessageBox
+    QDialog, QLineEdit, QDialogButtonBox, QMessageBox, QButtonGroup, QGridLayout
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
@@ -341,15 +341,52 @@ class CreateProfileDialog(QDialog):
                 background: transparent;
             }
             QLineEdit, QComboBox {
-                background: rgba(255, 255, 255, 0.2);
-                border: 1px solid rgba(255, 255, 255, 0.3);
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(111, 162, 200, 0.18),
+                    stop:1 rgba(232, 151, 189, 0.18)
+                );
+                border: 1px solid rgba(255, 255, 255, 0.35);
                 border-radius: 8px;
                 color: white;
                 font-size: 14px;
                 padding: 10px;
             }
             QLineEdit:focus, QComboBox:focus {
-                border: 2px solid rgba(68, 197, 230, 0.8);
+                border: 2px solid rgba(68, 197, 230, 0.9);
+                background: rgba(255, 255, 255, 0.22);
+            }
+            QComboBox QAbstractItemView {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(111, 162, 200, 0.9),
+                    stop:1 rgba(232, 151, 189, 0.9)
+                );
+                border: 1px solid rgba(255, 255, 255, 0.25);
+                border-radius: 10px;
+                color: white;
+                selection-background-color: rgba(68, 197, 230, 0.35);
+                selection-color: white;
+                padding: 6px;
+            }
+            QComboBox QAbstractItemView::item {
+                padding: 8px 12px;
+                margin: 2px 0;
+            }
+            QPushButton#iconChip {
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.25);
+                border-radius: 12px;
+                color: white;
+                font-size: 20px;
+                font-weight: 600;
+            }
+            QPushButton#iconChip:hover {
+                background: rgba(255, 255, 255, 0.18);
+            }
+            QPushButton#iconChip:checked {
+                background: rgba(68, 197, 230, 0.35);
+                border: 1px solid rgba(68, 197, 230, 0.8);
             }
         """)
         
@@ -381,10 +418,25 @@ class CreateProfileDialog(QDialog):
         icon_label.setStyleSheet("font-size: 13px; font-weight: 500;")
         layout.addWidget(icon_label)
         
-        self.icon_combo = QComboBox()
-        icons = ["🎯", "📞", "🎤", "💼", "🏠", "🎮", "🎵", "⭐", "💎", "🔥"]
-        self.icon_combo.addItems(icons)
-        layout.addWidget(self.icon_combo)
+        self.icons = ["\U0001f3a4", "\U0001f3a7", "\U0001f3b5", "\U0001f5e3", "\U0001f3b6", "\u2b50", "\U0001f31f", "\U0001f525", "\U0001f300", "\u2728"]
+        self.icon_group = QButtonGroup(self)
+        self.icon_group.setExclusive(True)
+        
+        icon_grid = QGridLayout()
+        icon_grid.setSpacing(10)
+        
+        for idx, icon in enumerate(self.icons):
+            btn = QPushButton(icon)
+            btn.setCheckable(True)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFixedSize(54, 54)
+            btn.setObjectName("iconChip")
+            self.icon_group.addButton(btn, idx)
+            icon_grid.addWidget(btn, idx // 5, idx % 5)
+            if idx == 0:
+                btn.setChecked(True)
+        
+        layout.addLayout(icon_grid)
         
         # Preset selection
         preset_label = QLabel("Voice Preset")
@@ -457,7 +509,8 @@ class CreateProfileDialog(QDialog):
             QMessageBox.warning(self, "Invalid Name", "Please enter a profile name.")
             return
         
-        icon = self.icon_combo.currentText()
+        selected_btn = self.icon_group.checkedButton()
+        icon = selected_btn.text() if selected_btn else self.icons[0]
         preset_id = self.preset_combo.currentData()
         goal_range = self.min_goal.currentData()
         
