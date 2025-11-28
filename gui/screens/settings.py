@@ -736,8 +736,9 @@ class SettingsScreen(QWidget):
         import urllib.request
 
         config = self.config_manager.get_config()
-        owner = config.get('update_repo_owner', 'hopefulopal')
-        repo = config.get('update_repo_name', 'aria-voice-studio')
+        # Default to the current Aria repo if not configured
+        owner = config.get('update_repo_owner', 'VocalOpal')
+        repo = config.get('update_repo_name', 'Aria')
         api_url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
 
         try:
