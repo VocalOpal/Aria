@@ -1,0 +1,80 @@
+
+    def keyPressEvent(self, event):
+        """Handle training screen keyboard shortcuts"""
+        from PyQt6.QtCore import Qt
+        
+        key = event.key()
+
+        # Space - Start/Stop training
+        if key == Qt.Key.Key_Space:
+            self.toggle_training()
+            self.show_shortcut_toast("⌨️ Training toggled")
+            event.accept()
+            return
+
+        # R - Record snapshot
+        if key == Qt.Key.Key_R and self.training_active:
+            self.record_snapshot()
+            event.accept()
+            return
+
+        # Esc - Stop training (handled by handle_escape_key for delegation)
+        super().keyPressEvent(event)
+
+    def handle_escape_key(self):
+        """Handle Escape key press (called from main window)"""
+        if self.training_active:
+            self.stop_training()
+            self.show_shortcut_toast("⌨️ Training stopped")
+
+    def record_snapshot(self):
+        """Record a voice snapshot during training"""
+        try:
+            if not self.training_active:
+                return
+
+            # Get current audio buffer
+            import numpy as np
+            from utils.error_handler import log_error
+
+            # Calculate current stats
+            avg_pitch = sum(self.pitch_readings) / len(self.pitch_readings) if self.pitch_readings else 0
+            
+            if len(self.pitch_readings) > 10:
+                import statistics
+                std_dev = statistics.stdev(list(self.pitch_readings)[-50:])
+                avg = statistics.mean(list(self.pitch_readings)[-50:])
+                stability = max(0, min(100, 100 - (std_dev / avg * 100)))
+            else:
+                stability = 0
+
+            # Create snapshot metadata
+            snapshot_data = {
+                'pitch': int(avg_pitch),
+                'stability': int(stability),
+                'duration': int(time.time() - self.session_start_time) if self.session_start_time else 0,
+                'timestamp': time.time()
+            }
+
+            # Save snapshot
+            snapshot_id = self.snapshot_manager.save_snapshot(
+                snapshot_data,
+                np.array(list(self.audio_buffer)) if self.audio_buffer else np.array([])
+            )
+
+            self.show_shortcut_toast(f"📸 Snapshot recorded: {snapshot_id[:8]}")
+
+        except Exception as e:
+            from utils.error_handler import log_error
+            log_error(e, "TrainingScreen.record_snapshot")
+            self.show_shortcut_toast("⚠️ Failed to record snapshot")
+
+    def show_shortcut_toast(self, message):
+        """Show toast notification for shortcuts"""
+        try:
+            # Get main window and show toast
+            main_window = self.window()
+            if hasattr(main_window, 'show_toast'):
+                main_window.show_toast(message)
+        except:
+            pass  # Silently fail
